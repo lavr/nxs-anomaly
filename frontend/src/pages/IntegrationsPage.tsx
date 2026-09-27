@@ -16,7 +16,7 @@ import {
 } from '@mantine/core';
 import { IconCheck, IconCopy, IconPlus, IconSettings } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
-import { useAllOf, useCreate, useDelete, useList } from '../api/hooks';
+import { useAllOf, useCreate, useDelete, useFullList } from '../api/hooks';
 import { INTEGRATION_TYPES, type Integration } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
 import { useI18n } from '../i18n/I18nProvider';
@@ -52,7 +52,7 @@ export function CopyField({ value }: { value: string }) {
 
 export function IntegrationsPage() {
   const { t } = useI18n();
-  const integrations = useList('integrations', { limit: 500 });
+  const integrations = useFullList('integrations');
   const remove = useDelete('integrations');
   const [creating, setCreating] = useState(false);
 

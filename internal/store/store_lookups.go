@@ -350,9 +350,25 @@ func (s *pgStore) ListUnresolvedAlertGroups(ctx context.Context, field string, v
 	for i := range values {
 		placeholders[i] = fmt.Sprintf("$%d", i+1)
 	}
-	q := fmt.Sprintf("SELECT data FROM %s WHERE %s IN (%s) AND status <> 'resolved'",
+	// logs and alert_ids are dropped here, in the database: decoding them was
+	// two thirds of the phone's dashboard, 200 ms for one person paged by 500
+	// open groups, and every event-stream tick of every paired phone pays it.
+	q := fmt.Sprintf("SELECT data - 'logs' - 'alert_ids' FROM %s WHERE %s IN (%s) AND status <> 'resolved'",
 		EntityTables["alert_groups"], field, strings.Join(placeholders, ","))
 	rows, err := s.pool.Query(ctx, q, values...)
+	if err != nil {
+		return nil, err
+	}
+	return scanRows(rows)
+}
+
+// ListUnresolvedAlertGroupsNotifying: see the Store interface. The join runs in
+// the database: the phone used to read every notification the person ever
+// had — a number that only grows — to learn which open groups had paged them.
+func (s *pgStore) ListUnresolvedAlertGroupsNotifying(ctx context.Context, userID string) ([]map[string]any, error) {
+	q := fmt.Sprintf("SELECT data - 'logs' - 'alert_ids' FROM %s WHERE status <> 'resolved' AND id IN (SELECT alert_group_id FROM %s WHERE user_id = $1)",
+		EntityTables["alert_groups"], EntityTables["notifications"])
+	rows, err := s.pool.Query(ctx, q, userID)
 	if err != nil {
 		return nil, err
 	}

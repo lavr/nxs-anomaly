@@ -15,7 +15,7 @@ import {
 } from '@mantine/core';
 import { IconCalendarPlus, IconSettings } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
-import { useAllOf, useCreate, useDelete, useList, useScheduleCoverage } from '../api/hooks';
+import { useAllOf, useCreate, useDelete, useFullList, useScheduleCoverage } from '../api/hooks';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
 import type { ScheduleCoverageItem } from '../api/types';
 import { useI18n } from '../i18n/I18nProvider';
@@ -23,7 +23,7 @@ import { EMPTY_VALUE } from '../i18n/format';
 
 export function SchedulesPage() {
   const { t } = useI18n();
-  const schedules = useList('schedules', { limit: 500 });
+  const schedules = useFullList('schedules');
   const teams = useAllOf('teams');
   const coverage = useScheduleCoverage();
   const remove = useDelete('schedules');

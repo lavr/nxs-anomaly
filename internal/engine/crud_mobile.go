@@ -446,7 +446,10 @@ func (e *Engine) mobileSnapshot(ctx context.Context, userID string) (map[string]
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	userNotifs, err := e.store.ListItemsIn(ctx, "notifications", "user_id", []any{userID})
+	// The open groups that paged this person, found by the database. Reading
+	// the person's notifications to learn this meant every one they ever had,
+	// resolved groups included, on every event-stream tick.
+	notifiedGroups, err := e.store.ListUnresolvedAlertGroupsNotifying(ctx, userID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -467,10 +470,10 @@ func (e *Engine) mobileSnapshot(ctx context.Context, userID string) (map[string]
 	state.Teams = teamsMap
 	state.Schedules = schedsMap
 
-	// Pre-build set of group IDs that have a notification for this user (O(M) once).
-	userGroupSet := make(map[string]bool, len(userNotifs))
-	for _, n := range userNotifs {
-		userGroupSet[utils.StrVal(n, "alert_group_id")] = true
+	// The groups that have a notification for this user.
+	userGroupSet := make(map[string]bool, len(notifiedGroups))
+	for _, g := range notifiedGroups {
+		userGroupSet[utils.StrVal(g, "id")] = true
 	}
 
 	now := utils.UTCNow()
@@ -486,17 +489,7 @@ func (e *Engine) mobileSnapshot(ctx context.Context, userID string) (map[string]
 			chainIDs = append(chainIDs, id)
 		}
 	}
-	notifiedIDs := make([]any, 0, len(userGroupSet))
-	for id := range userGroupSet {
-		if id != "" {
-			notifiedIDs = append(notifiedIDs, id)
-		}
-	}
 	unresolvedGroups, err := e.unresolvedGroupsIn(ctx, "escalation_chain_id", chainIDs)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	notifiedGroups, err := e.unresolvedGroupsIn(ctx, "id", notifiedIDs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -545,8 +538,8 @@ func groupIsRelevantToUser(state *store.State, group map[string]any, userID stri
 }
 
 // unresolvedGroupsIn reads unresolved alert groups by id or chain in batches,
-// keeping each query well inside PostgreSQL's parameter limit however long a
-// person's notification history is.
+// keeping each query well inside PostgreSQL's parameter limit however many
+// values it is given.
 func (e *Engine) unresolvedGroupsIn(ctx context.Context, field string, values []any) ([]map[string]any, error) {
 	const batch = 5000
 	var out []map[string]any

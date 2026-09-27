@@ -14,7 +14,7 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { IconPencil, IconUsersPlus } from '@tabler/icons-react';
-import { useAllOf, useCreate, useDelete, useList, useUpdate } from '../api/hooks';
+import { useAllOf, useCreate, useDelete, useFullList, useUpdate } from '../api/hooks';
 import type { Team } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
 import { EMPTY_VALUE } from '../i18n/format';
@@ -22,7 +22,7 @@ import { useI18n } from '../i18n/I18nProvider';
 
 export function TeamsPage() {
   const { t } = useI18n();
-  const teams = useList('teams', { limit: 500 });
+  const teams = useFullList('teams');
   const users = useAllOf('users');
   const remove = useDelete('teams');
   const [editing, setEditing] = useState<Team | null>(null);

@@ -32,7 +32,7 @@ import {
 import {
   useCreate,
   useDelete,
-  useList,
+  useFullList,
   useToggleDuty,
   useUpdateUser,
 } from '../api/hooks';
@@ -71,7 +71,7 @@ export function UsersPage() {
   const priorityLabel = usePriorityLabel();
   const roleLabel = useRoleLabel();
   const channelLabel = useChannelLabel();
-  const users = useList('users', { limit: 500 });
+  const users = useFullList('users');
   const remove = useDelete('users');
   const toggleDuty = useToggleDuty();
   const [editing, setEditing] = useState<User | null>(null);

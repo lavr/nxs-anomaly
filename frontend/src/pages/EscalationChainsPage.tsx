@@ -27,7 +27,7 @@ import {
   IconTrash,
   IconUserSearch,
 } from '@tabler/icons-react';
-import { useAllOf, useCreate, useDelete, useList, useOnCall, useUpdate } from '../api/hooks';
+import { useAllOf, useCreate, useDelete, useFullList, useOnCall, useUpdate } from '../api/hooks';
 import { STEP_KINDS, type EscalationChain, type EscalationStep, type StepKind } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
 import {
@@ -73,7 +73,7 @@ export function EscalationChainsPage() {
   const { t } = useI18n();
   const stepHint = useStepHint();
   const names = useChainNames();
-  const chains = useList('escalation-chains', { limit: 500 });
+  const chains = useFullList('escalation-chains');
   const remove = useDelete('escalation-chains');
   const [selected, setSelected] = useState<EscalationChain | null>(null);
   const [creating, setCreating] = useState(false);
