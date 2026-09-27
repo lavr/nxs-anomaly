@@ -4,6 +4,56 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.6] — 2026-09-27
+
+### Fixed
+- **1.9.5 was tagged but its pipeline stopped at `community:cut`.** A test of
+  the new ingest gate read the integration's slot before any of its goroutines
+  had entered the gate, found none and panicked; on a busy runner the
+  goroutines had not started yet. The test now counts a missing slot as empty.
+  The product code is unchanged from 1.9.5.
+
+## [1.9.5] — 2026-09-27
+
+### Fixed
+- **An alert storm on one integration no longer runs the API out of memory.**
+  Ingests on one integration queue behind its lock, and each reads the
+  reference collections (users, chains, schedules, teams, …) before queueing.
+  When the five-second cache entry expired, every queued ingest loaded its own
+  copy of every collection and held it while it waited: at 200 alerts/s on one
+  integration both API replicas of a sandbox were OOM-killed at 256 MiB and
+  restarted in a loop until the storm stopped. Concurrent misses now share one
+  load. On a copy of that sandbox's data the API peaked at 65 MiB instead of
+  646 MiB at 200 alerts/s, and at 122 MiB instead of 2 GiB with 1,000 senders
+  at once.
+- **A storm on one integration no longer stalls the rest of the API.** The
+  integration's ingest lock is taken inside the transaction, so every ingest
+  waiting for it held one of the ten pooled connections. A storm parked all ten
+  on that one lock, and the web UI, the phone and every other integration
+  queued behind it: at 200 alerts/s on one integration, a users list went from
+  3 ms to 3.4 s and an alert on another integration from 38 ms to 8.3 s, and
+  the storm's own senders waited ~30 s before their connections were dropped.
+  Now a replica sends at most two ingests of one integration to the database
+  at a time and queues up to 128 more without a connection; past that it
+  answers `503` with `Retry-After: 1` at once. Under the same storm the users
+  list stays at 2 ms and the other integration at 49 ms. The storming
+  integration itself takes about a fifth fewer alerts per second than with all
+  ten connections spent on it (27 instead of 33 locally), and a sender that
+  retries on `503` loses nothing.
+- **Deleting a user no longer fails with "internal error" when the worker is
+  paging them.** The delete cascades to the user's notifications, and a
+  concurrent insert of a new one made PostgreSQL break the deadlock by
+  aborting the delete (seen on a sandbox while resolve notices for 900 groups
+  went out). Deletes now retry a transaction PostgreSQL rolled back for a
+  deadlock or a serialization failure, and ingest answers such a rollback with
+  `503`, so the sender retries instead of dropping the alert.
+
+### Documentation
+- The OpenAPI entry for `GET /api/v1/history` lists the filters the endpoint
+  takes: `integration`, `severity`, `status`, `channel`, `user`, `team`.
+- The ingest section of the API guide describes when ingest answers `503` and
+  how one integration's storm is contained.
+
 ## [1.9.4] — 2026-09-26
 
 ### Fixed

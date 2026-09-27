@@ -1,7 +1,9 @@
 package store
 
 import (
+	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -36,6 +38,11 @@ func IsUnavailable(err error) bool {
 	if isRetryableConnectError(err) {
 		return true
 	}
+	// A transaction PostgreSQL rolled back for colliding with another is
+	// retryable in the same sense: the sender should come back, not give up.
+	if IsTransactionConflict(err) {
+		return true
+	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && len(pgErr.Code) >= 2 {
 		switch pgErr.Code[:2] {
@@ -44,4 +51,35 @@ func IsUnavailable(err error) bool {
 		}
 	}
 	return false
+}
+
+// IsTransactionConflict reports whether err is PostgreSQL rolling a
+// transaction back because it collided with another one: 40P01
+// deadlock_detected or 40001 serialization_failure. The whole transaction was
+// undone, so running it again is safe and usually succeeds.
+//
+// Seen on a sandbox: deleting a user cascades to their notifications while the
+// worker inserts new ones for them (resolve notices for 900 groups closed a
+// moment earlier). Each waited for the other, PostgreSQL killed the delete, and
+// the admin got "internal error" for a request that worked when repeated.
+func IsTransactionConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && (pgErr.Code == "40P01" || pgErr.Code == "40001")
+}
+
+// retryConflicts runs fn up to three times while it fails with a transaction
+// conflict, backing off briefly so the other transaction can finish.
+func retryConflicts(ctx context.Context, fn func() error) error {
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		if err = fn(); !IsTransactionConflict(err) {
+			return err
+		}
+		select {
+		case <-time.After(time.Duration(attempt+1) * 50 * time.Millisecond):
+		case <-ctx.Done():
+			return err
+		}
+	}
+	return err
 }

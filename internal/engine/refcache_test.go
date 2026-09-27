@@ -2,6 +2,8 @@ package engine
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -108,5 +110,106 @@ func TestSetReferenceCacheTTL(t *testing.T) {
 	eng.SetReferenceCacheTTL(0)
 	if _, ok := c.get("users", now.Add(9*time.Second)); !ok {
 		t.Fatal("non-positive duration must not change the TTL")
+	}
+}
+
+// slowRefStore holds every ListCollection until release is closed, so the
+// callers of a cold cache are all waiting on a load at the same time.
+type slowRefStore struct {
+	store.PostgreSQLStore
+	calls   atomic.Int32
+	release chan struct{}
+}
+
+func (s *slowRefStore) ListCollection(_ context.Context, _ string) ([]map[string]any, error) {
+	s.calls.Add(1)
+	<-s.release
+	return []map[string]any{{"id": "u1"}}, nil
+}
+
+// An alert storm on one integration queues ingests behind its advisory lock,
+// and every one of them reads the reference collections first. When the cache
+// entry expired, each queued ingest used to load its own copy of every
+// collection and keep it while it waited: 200 alerts/s held hundreds of copies
+// and the API was OOM-killed at 256 MiB. Concurrent misses share one load now.
+func TestRefCollectionConcurrentMissesShareOneLoad(t *testing.T) {
+	stub := &slowRefStore{release: make(chan struct{})}
+	eng := New(stub)
+	const callers = 50
+	var wg sync.WaitGroup
+	results := make([]map[string]map[string]any, callers)
+	for i := range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			items, err := eng.refCollection(context.Background(), "users")
+			if err != nil {
+				t.Errorf("refCollection: %v", err)
+			}
+			results[i] = items
+		}()
+	}
+	for stub.calls.Load() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond) // let the other callers arrive at the miss
+	close(stub.release)
+	wg.Wait()
+	if got := stub.calls.Load(); got != 1 {
+		t.Fatalf("ListCollection calls = %d, want 1 for %d concurrent misses", got, callers)
+	}
+	for i, items := range results {
+		if items["u1"] == nil {
+			t.Fatalf("caller %d got %v, want the shared load", i, items)
+		}
+	}
+}
+
+// A caller that gives up stops waiting, and does not cancel the load the
+// others are waiting on.
+func TestRefCollectionWaiterCancelDoesNotFailTheLoad(t *testing.T) {
+	stub := &slowRefStore{release: make(chan struct{})}
+	eng := New(stub)
+	done := make(chan error, 1)
+	go func() {
+		_, err := eng.refCollection(context.Background(), "users")
+		done <- err
+	}()
+	for stub.calls.Load() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := eng.refCollection(ctx, "users"); err == nil {
+		t.Fatal("a cancelled waiter must get its context error")
+	}
+	close(stub.release)
+	if err := <-done; err != nil {
+		t.Fatalf("the load others wait on failed: %v", err)
+	}
+}
+
+// A write made while a load is in flight must not be hidden by it: callers
+// arriving after the write start a fresh load, and the stale one is not
+// cached.
+func TestRefCollectionWriteDuringLoadIsNotHidden(t *testing.T) {
+	stub := &slowRefStore{release: make(chan struct{})}
+	eng := New(stub)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = eng.refCollection(context.Background(), "users")
+	}()
+	for stub.calls.Load() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	eng.refCache.invalidate("users")
+	close(stub.release)
+	<-done
+	if _, err := eng.refCollection(context.Background(), "users"); err != nil {
+		t.Fatal(err)
+	}
+	if got := stub.calls.Load(); got != 2 {
+		t.Fatalf("ListCollection calls = %d, want 2: the load begun before the write must not be cached", got)
 	}
 }

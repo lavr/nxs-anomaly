@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/nixys/nxs-anomaly/internal/engine"
 )
 
 // TestIngestAnswers503WhenTheDatabaseIsGone: the status code decides whether the
@@ -45,5 +47,14 @@ func TestIngestKeeps500ForRealFaults(t *testing.T) {
 	}
 	if w.Header().Get("Retry-After") != "" {
 		t.Error("Retry-After on a permanent fault invites a retry loop")
+	}
+}
+
+// An integration with a full ingest queue asks the sender to come back soon.
+func TestWriteIngestErrorBusyIs503WithRetryAfter(t *testing.T) {
+	w := httptest.NewRecorder()
+	writeIngestError(w, engine.ErrIngestBusy, "webhook", "k1")
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
+		t.Fatalf("busy: code=%d Retry-After=%q, want 503 with Retry-After", w.Code, w.Header().Get("Retry-After"))
 	}
 }
