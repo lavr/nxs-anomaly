@@ -13,7 +13,7 @@ import {
   Textarea,
 } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
-import { useAllOf, useCreate, useDelete, useList } from '../api/hooks';
+import { useAllOf, useCreate, useDelete, useFullList } from '../api/hooks';
 import type { MaintenanceWindow } from '../api/types';
 import { AbsoluteTime, ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
 import { useI18n } from '../i18n/I18nProvider';
@@ -25,7 +25,7 @@ import { useI18n } from '../i18n/I18nProvider';
  */
 export function MaintenancePage() {
   const { t } = useI18n();
-  const windows = useList('maintenance-windows', { limit: 500 });
+  const windows = useFullList('maintenance-windows');
   const remove = useDelete('maintenance-windows');
   const integrations = useAllOf('integrations');
   const [creating, setCreating] = useState(false);

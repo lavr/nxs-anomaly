@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.7] — 2026-09-27
+
+### Fixed
+- **The phone's dashboard and event stream of a person paged by many groups
+  are twice as fast, and no longer slow down with the person's history.** Both
+  read every open group that concerns the person in full — logs and alert ids
+  included, which grow with a group's life — and dropped those fields only
+  after decoding them; and to find the groups that had paged the person, they
+  read every notification the person ever had, resolved groups included. The
+  database now returns the groups without logs and alert ids, and finds the
+  groups that paged the person itself. For one person paged by 500 open groups
+  the dashboard went from 197 to 88 ms locally (734 ms on a sandbox), and the
+  event stream recomputes the same list for every paired phone every ten
+  seconds. The answer to the phone is unchanged.
+- **The Users, Integrations, Escalation chains, Teams, Schedules and
+  Maintenance pages list everything, not the first 500.** Each asked the API
+  for one page of 500 and showed it as the whole list, with nothing saying
+  anything was left out: on a sandbox with 574 users and 564 integrations,
+  74 people and 64 integrations — typically the ones just created — could not
+  be found or edited in the web UI. The selects that pick a user, a chain or an
+  integration read one page of 1000, the API's largest, under a comment saying
+  they read every page. Both now read page after page until the list is
+  complete.
+
 ## [1.9.6] — 2026-09-27
 
 ### Fixed

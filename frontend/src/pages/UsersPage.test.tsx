@@ -94,6 +94,30 @@ describe('UsersPage', () => {
     expect(screen.getByText('Person bob')).toBeInTheDocument();
   });
 
+  it('lists people past the first page of the API', async () => {
+    // A sandbox with 553 people showed 500: the one just created was missing
+    // from the page, with nothing saying that anyone was left out.
+    const first = Array.from({ length: 1000 }, (_, i) => user(`p${i}`));
+    get.mockImplementation((path: string, params?: { offset?: number }) => {
+      if (!path.startsWith('/api/v1/users')) return Promise.resolve({ items: [], total: 0 });
+      const offset = params?.offset ?? 0;
+      return Promise.resolve(offset === 0 ? { items: first, total: 1001 } : { items: [user('latecomer')], total: 1001 });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MantineProvider>
+        <QueryClientProvider client={client}>
+          <MemoryRouter>
+            <UsersPage />
+          </MemoryRouter>
+        </QueryClientProvider>
+      </MantineProvider>,
+    );
+
+    expect(await screen.findByText('Person latecomer')).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/api/v1/users', expect.objectContaining({ offset: 1000 }));
+  });
+
   it('shows an empty state rather than a bare table', async () => {
     renderPage([]);
 

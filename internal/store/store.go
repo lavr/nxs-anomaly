@@ -525,8 +525,13 @@ type PostgreSQLStore interface {
 	ListItemsByIDs(ctx context.Context, collection string, ids []string) ([]map[string]any, error)
 	// ListUnresolvedAlertGroups returns the alert groups not resolved whose
 	// field (id or escalation_chain_id) is one of values: the groups one person
-	// can be concerned with, read without loading every open group.
+	// can be concerned with, read without loading every open group. The rows
+	// come without logs and alert_ids, which grow with a group's life and are
+	// read from the group itself when its card opens.
 	ListUnresolvedAlertGroups(ctx context.Context, field string, values []any) ([]map[string]any, error)
+	// ListUnresolvedAlertGroupsNotifying returns the unresolved alert groups
+	// that have a notification for userID, shaped like ListUnresolvedAlertGroups.
+	ListUnresolvedAlertGroupsNotifying(ctx context.Context, userID string) ([]map[string]any, error)
 	// PageUnresolvedAlertGroups counts the unresolved alert groups outside the
 	// hidden integrations and returns one page of them, newest alert first
 	// (ties by id). A group with no integration is never hidden.

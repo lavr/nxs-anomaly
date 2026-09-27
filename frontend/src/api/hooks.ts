@@ -125,16 +125,46 @@ export function useItem<R extends ListResource>(resource: R, id: string | undefi
   });
 }
 
+// The API's largest page.
+const MAX_PAGE = 1000;
+
+/**
+ * Every item of a collection, page after page.
+ *
+ * One request with a large limit is not "every item": the API caps a page at
+ * 1000 and the list pages asked for 500, and neither said so — on a sandbox
+ * with 553 users and 765 integrations, the users and integrations just created
+ * were missing from their own pages, with no sign that anything was left out.
+ */
+async function fetchAll<R extends ListResource>(resource: R): Promise<ResourceType[R][]> {
+  const items: ResourceType[R][] = [];
+  for (;;) {
+    const page = await api.get<Page<ResourceType[R]>>(LIST_PATHS[resource], { limit: MAX_PAGE, offset: items.length });
+    const got = page.items ?? [];
+    items.push(...got);
+    if (got.length < MAX_PAGE || items.length >= (page.total ?? 0)) return items;
+  }
+}
+
 /** Loads every page of a collection — used for the small reference collections
  *  (users, teams, schedules, chains, integrations) that feed selects. */
 export function useAllOf<R extends ListResource>(resource: R) {
   return useQuery<ResourceType[R][]>({
     queryKey: [resource, 'all'],
-    queryFn: async () => {
-      const page = await api.get<Page<ResourceType[R]>>(LIST_PATHS[resource], { limit: 1000 });
-      return page.items ?? [];
-    },
+    queryFn: () => fetchAll(resource),
     staleTime: 30_000,
+  });
+}
+
+/** A whole collection in the shape of one page, for the pages that list one
+ *  (users, integrations, chains, teams, schedules, maintenance windows). */
+export function useFullList<R extends ListResource>(resource: R) {
+  return useQuery<Page<ResourceType[R]>>({
+    queryKey: [resource, 'full'],
+    queryFn: async () => {
+      const items = await fetchAll(resource);
+      return { items, total: items.length, limit: items.length, offset: 0 };
+    },
   });
 }
 

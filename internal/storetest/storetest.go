@@ -621,6 +621,16 @@ func (m *Store) ListUnresolvedAlertGroups(_ context.Context, field string, value
 	}), nil
 }
 
+func (m *Store) ListUnresolvedAlertGroupsNotifying(_ context.Context, userID string) ([]map[string]any, error) {
+	notified := map[any]bool{}
+	for _, n := range m.where("notifications", func(r map[string]any) bool { return r["user_id"] == userID }) {
+		notified[n["alert_group_id"]] = true
+	}
+	return m.where("alert_groups", func(r map[string]any) bool {
+		return r["status"] != "resolved" && notified[r["id"]]
+	}), nil
+}
+
 func (m *Store) ListItemsByIDs(_ context.Context, col string, ids []string) ([]map[string]any, error) {
 	idset := make(map[string]bool, len(ids))
 	for _, id := range ids {
