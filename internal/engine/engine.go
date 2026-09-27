@@ -123,8 +123,9 @@ var advisoryLock = map[string]int64{
 type Engine struct {
 	store         store.PostgreSQLStore
 	deliveryCfg   DeliveryConfig
-	templateCache sync.Map  // "integrationID:channel" → templateCacheEntry; lazy, TTL-bounded
-	refCache      *refCache // short-TTL cache of reference collections; nil in unit tests
+	templateCache sync.Map    // "integrationID:channel" → templateCacheEntry; lazy, TTL-bounded
+	refCache      *refCache   // short-TTL cache of reference collections; nil in unit tests
+	ingestGate    *ingestGate // bounds the ingests per integration that hold a connection; nil in unit tests
 	kafkaProducer OutboxProducer
 	// kafkaTopic and kafkaOutboxCycleBudget are set here and read only by files
 	// tagged !community — the analytics emitters and the outbox drain. The cut
@@ -213,6 +214,7 @@ func New(s store.PostgreSQLStore) *Engine {
 	return &Engine{
 		store:                 refInvalidatingStore{PostgreSQLStore: s, cache: cache},
 		refCache:              cache,
+		ingestGate:            newIngestGate(),
 		deliveryCfg:           cfg,
 		metrics:               noopMetrics{},
 		breaker:               newCircuitBreaker(cfg.CircuitBreakerThreshold, cfg.CircuitBreakerCooldown),

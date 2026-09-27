@@ -177,6 +177,11 @@ func (e *Engine) IngestAlert(ctx context.Context, integrationKey string, payload
 }
 
 func (e *Engine) ingestAlert(ctx context.Context, integrationKey string, payload map[string]any) (map[string]any, error) {
+	release, err := e.enterIngest(ctx, integrationKey)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	integration, err := e.store.FindIntegrationByKey(ctx, integrationKey)
 	if err != nil {
 		return nil, err
@@ -577,6 +582,11 @@ func (e *Engine) ingestOneLocked(state *store.State, integration map[string]any,
 // batch whose every alert was dropped by the pipeline opens no transaction and
 // still answers, because the sender delivered them.
 func (e *Engine) ingestNormalizedBatch(ctx context.Context, integrationKey string, normalized []map[string]any) ([]any, error) {
+	release, err := e.enterIngest(ctx, integrationKey)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	integration, err := e.store.FindIntegrationByKey(ctx, integrationKey)
 	if err != nil {
 		return nil, err
@@ -622,6 +632,11 @@ func (e *Engine) IngestAlertmanager(ctx context.Context, integrationKey string, 
 	if !ok || len(alerts) == 0 {
 		return nil, errValidation("Alertmanager payload must contain non-empty alerts[]")
 	}
+	release, err := e.enterIngest(ctx, integrationKey)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	integration, err := e.store.FindIntegrationByKey(ctx, integrationKey)
 	if err != nil {
 		return nil, err

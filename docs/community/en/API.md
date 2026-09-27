@@ -216,7 +216,17 @@ header is the hex HMAC-SHA256 of the request body exactly as sent, with or witho
 a `sha256=` prefix. The other formats are not signed by their senders and are
 authenticated by the key alone. Returns `202 Accepted` (or `200` for victorops
 and the legacy pool), `404` for an unknown key, `400` on a validation error, `429`
-when the rate limit is exceeded.
+when the rate limit is exceeded, and `503` with `Retry-After` when the sender
+should come back: the database is unavailable, the transaction collided with
+another, or the integration already has 128 alerts queued on this replica.
+
+Ingests of one integration are written one after another, so one integration
+takes on the order of 25–100 alerts a second depending on the database. Each
+replica sends at most two of an integration's ingests to the database at a time
+and queues up to 128 more without holding a connection; past that it answers
+`503` at once. A storm on one integration therefore slows only that integration,
+not the rest of the API, and a sender that retries on `503` (Alertmanager,
+Grafana, most webhook clients) loses nothing.
 
 ---
 

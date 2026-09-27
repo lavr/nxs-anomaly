@@ -96,6 +96,14 @@ func writeIngestError(w http.ResponseWriter, err error, source, key string) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": err.Error()})
 		return
 	}
+	// One integration has more ingests queued in this process than it may: the
+	// sender is asked to come back, which keeps the alert, instead of waiting
+	// until its own timeout, which may not.
+	if errors.Is(err, engine.ErrIngestBusy) {
+		w.Header().Set("Retry-After", "1")
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		return
+	}
 	slog.Error("ingest_failed", "source", source, "key", key, "error", err, "request_id", w.Header().Get("X-Request-ID"))
 	// A database that cannot serve right now is not the sender's fault, and the
 	// status code is what decides whether the alert is retried or dropped.

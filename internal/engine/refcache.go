@@ -24,6 +24,20 @@ type refCache struct {
 	mu      sync.Mutex
 	ttl     time.Duration
 	entries map[string]refCacheEntry
+	// flights are the loads under way, one per collection. An alert storm on
+	// one integration queues its ingests behind the advisory lock, and each
+	// reads the references before queueing: when an entry expired, every one
+	// of them loaded its own copy and held it while it waited. 200 alerts/s
+	// kept hundreds of copies alive and the API was OOM-killed at 256 MiB.
+	// Misses on a collection that is already loading wait for that load.
+	flights map[string]*refFlight
+}
+
+// refFlight is one load of a collection that concurrent misses share.
+type refFlight struct {
+	done  chan struct{}
+	items map[string]map[string]any
+	err   error
 }
 
 type refCacheEntry struct {
@@ -36,7 +50,7 @@ type refCacheEntry struct {
 }
 
 func newRefCache() *refCache {
-	return &refCache{ttl: refCacheTTL, entries: map[string]refCacheEntry{}}
+	return &refCache{ttl: refCacheTTL, entries: map[string]refCacheEntry{}, flights: map[string]*refFlight{}}
 }
 
 func (c *refCache) setTTL(d time.Duration) {
@@ -85,27 +99,57 @@ func (c *refCache) invalidate(names ...string) {
 	defer c.mu.Unlock()
 	for _, name := range names {
 		delete(c.entries, name)
+		// A load begun before the write may have read the old rows: callers
+		// from now on start their own, and that one is not cached.
+		delete(c.flights, name)
 	}
+}
+
+// load returns the collection from the load under way for name, or runs one.
+// The load is not cancelled with the caller that started it, because others
+// may be waiting on it; a caller whose context ends stops waiting.
+func (c *refCache) load(ctx context.Context, name string, fn func(context.Context) (map[string]map[string]any, error)) (map[string]map[string]any, error) {
+	c.mu.Lock()
+	if f, ok := c.flights[name]; ok {
+		c.mu.Unlock()
+		select {
+		case <-f.done:
+			return f.items, f.err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	f := &refFlight{done: make(chan struct{})}
+	c.flights[name] = f
+	c.mu.Unlock()
+
+	now := time.Now()
+	f.items, f.err = fn(context.WithoutCancel(ctx))
+	c.mu.Lock()
+	if c.flights[name] == f {
+		delete(c.flights, name)
+		if f.err == nil {
+			c.entries[name] = refCacheEntry{loadedAt: now, items: f.items}
+		}
+	}
+	c.mu.Unlock()
+	close(f.done)
+	return f.items, f.err
 }
 
 // refCollection returns the named collection as an id→item map, served from
 // the short-TTL cache. The returned map and its items are shared across
 // goroutines and MUST be treated as read-only by callers and mutators.
 func (e *Engine) refCollection(ctx context.Context, name string) (map[string]map[string]any, error) {
-	now := time.Now()
-	if e.refCache != nil {
-		if items, ok := e.refCache.get(name, now); ok {
-			return items, nil
-		}
+	if e.refCache == nil {
+		return e.loadRefCollection(ctx, name)
 	}
-	items, err := e.loadRefCollection(ctx, name)
-	if err != nil {
-		return nil, err
+	if items, ok := e.refCache.get(name, time.Now()); ok {
+		return items, nil
 	}
-	if e.refCache != nil {
-		e.refCache.put(name, items, now)
-	}
-	return items, nil
+	return e.refCache.load(ctx, name, func(ctx context.Context) (map[string]map[string]any, error) {
+		return e.loadRefCollection(ctx, name)
+	})
 }
 
 func (e *Engine) loadRefCollection(ctx context.Context, name string) (map[string]map[string]any, error) {

@@ -321,9 +321,13 @@ func (s *pgStore) DeleteItem(ctx context.Context, collection, id string) (map[st
 		return nil, fmt.Errorf("unknown collection: %s", collection)
 	}
 	var dataJSON []byte
-	err := s.pool.QueryRow(ctx,
-		fmt.Sprintf("DELETE FROM %s WHERE id=$1 RETURNING data", table), id,
-	).Scan(&dataJSON)
+	// A delete cascades (a user's notifications, …) and can deadlock with a
+	// concurrent insert into what it cascades to; see IsTransactionConflict.
+	err := retryConflicts(ctx, func() error {
+		return s.pool.QueryRow(ctx,
+			fmt.Sprintf("DELETE FROM %s WHERE id=$1 RETURNING data", table), id,
+		).Scan(&dataJSON)
+	})
 	if err != nil {
 		if isNotFound(err) {
 			return nil, nil
@@ -401,6 +405,18 @@ func (s *pgStore) SoftDeleteItemAudited(ctx context.Context, collection, id stri
 }
 
 func (s *pgStore) deleteAudited(ctx context.Context, collection, id string, ev AuditEvent, soft bool) (map[string]any, error) {
+	// A hard delete cascades and can deadlock with a concurrent insert into
+	// what it cascades to; see IsTransactionConflict.
+	var item map[string]any
+	err := retryConflicts(ctx, func() error {
+		var err error
+		item, err = s.deleteAuditedOnce(ctx, collection, id, ev, soft)
+		return err
+	})
+	return item, err
+}
+
+func (s *pgStore) deleteAuditedOnce(ctx context.Context, collection, id string, ev AuditEvent, soft bool) (map[string]any, error) {
 	table, ok := EntityTables[collection]
 	if !ok {
 		return nil, fmt.Errorf("unknown collection: %s", collection)

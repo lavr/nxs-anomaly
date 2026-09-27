@@ -1234,6 +1234,18 @@ export interface paths {
                 query?: {
                     from?: components["parameters"]["From"];
                     to?: components["parameters"]["To"];
+                    /** @description Only groups of this integration id. */
+                    integration?: string;
+                    /** @description Only groups of this severity level; aliases of the same level (sev1 for critical) count. */
+                    severity?: string;
+                    /** @description Only groups in this status. */
+                    status?: string;
+                    /** @description Only groups with a notification on this channel. */
+                    channel?: string;
+                    /** @description Only groups that notified this user id. */
+                    user?: string;
+                    /** @description Only groups that notified a member of this team id. */
+                    team?: string;
                     limit?: components["parameters"]["Limit"];
                     offset?: components["parameters"]["Offset"];
                 };
