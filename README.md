@@ -1,4 +1,4 @@
-# nxs-anomaly Community
+# nxs-anomaly
 
 [![GitHub release](https://img.shields.io/github/v/release/nixys/nxs-anomaly)](https://github.com/nixys/nxs-anomaly/releases)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/nxs-anomaly)](https://artifacthub.io/packages/helm/nxs-anomaly/nxs-anomaly)
@@ -15,8 +15,6 @@ person on call, and escalate until someone acknowledges. Follow notifications,
 acknowledgements and resolutions in one shared timeline.
 
 ![Screenshot 1: Main Page](assets/screenshot1.png)
-
-**Apache 2.0 · Go + PostgreSQL · No message broker or cache required · English and Russian UI**
 
 ## Introduction
 
@@ -65,6 +63,8 @@ acknowledgements and resolutions in one shared timeline.
 ![Alert flow: ingestion and routing, on-call escalation, notification delivery, acknowledgement and resolution](assets/nxs-anomaly-alert-flow.svg)
 
 ## Quickstart
+
+### Try the demo first
 
 One command starts a ready-to-explore installation with a
 team, an on-call rotation, an escalation chain, a webhook integration and an alert
