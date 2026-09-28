@@ -1,7 +1,5 @@
 # Distributed tracing (OpenTelemetry)
 
-*Русская версия: [TRACING.md](../ru/TRACING.md)*
-
 ## Why, when there are already metrics and logs
 
 The service exports some forty Prometheus metrics and structured logs. Metrics

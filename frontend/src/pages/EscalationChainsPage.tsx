@@ -30,6 +30,7 @@ import {
 import { useAllOf, useCreate, useDelete, useFullList, useOnCall, useUpdate } from '../api/hooks';
 import { STEP_KINDS, type EscalationChain, type EscalationStep, type StepKind } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
+import { ListPager, ListSearch, usePagedList } from '../components/PagedList';
 import {
   chainPagesNobody,
   stepReachesNobody,
@@ -74,6 +75,7 @@ export function EscalationChainsPage() {
   const stepHint = useStepHint();
   const names = useChainNames();
   const chains = useFullList('escalation-chains');
+  const rows = usePagedList(chains.data?.items, ['name']);
   const remove = useDelete('escalation-chains');
   const [selected, setSelected] = useState<EscalationChain | null>(null);
   const [creating, setCreating] = useState(false);
@@ -90,14 +92,16 @@ export function EscalationChainsPage() {
         }
       />
 
+      <ListSearch list={rows} />
+
       <QueryState
         query={chains}
         isEmpty={(data) => data.items.length === 0}
         emptyLabel={t('chains.empty')}
       >
-        {(data) => (
+        {() => (
           <Stack gap="md">
-            {data.items.map((chain) => (
+            {rows.items.map((chain) => (
               <Paper withBorder p="lg" key={chain.id}>
                 <Group justify="space-between" mb="sm">
                   <Group gap="sm">
@@ -167,6 +171,8 @@ export function EscalationChainsPage() {
           </Stack>
         )}
       </QueryState>
+
+      <ListPager list={rows} />
 
       <CreateChainModal opened={creating} onClose={() => setCreating(false)} />
       <StepsModal chain={selected} onClose={() => setSelected(null)} />

@@ -1,7 +1,5 @@
 # API reference
 
-*Русская версия: [API.md](../ru/API.md)*
-
 nxs-anomaly exposes two HTTP surfaces:
 
 1. **Alert ingest** — `/integrations/v1/*`, `/v2/alert/pool` (authenticated by the
@@ -279,6 +277,7 @@ The practical configuration guide is in [CONFIGURATION.md](CONFIGURATION.md).
 |---|---|
 | GET/POST | `/api/v1/teams`, `/api/v1/schedules`, `/api/v1/escalation-chains`, `/api/v1/integrations` |
 | GET/PUT/DELETE | `…/{id}` |
+| GET | `/api/v1/on-call` — who is on call right now across every enabled schedule: `items` (`user_id`, `name`, `username`, `schedule_id`, `schedule_name`, `source`) and `at`. Resolved from the schedules, not from the manual `on_duty` flag |
 | GET | `/api/v1/schedules/{id}/on-call?at=<ISO>` — plus `source` and a `next` segment |
 | GET | `/api/v1/schedules/{id}/preview?from=<ISO>&to=<ISO>` — intervals, gaps, overlaps, `unknown_users`, coverage (the next 4 weeks by default) |
 | GET | `/api/v1/schedules/coverage` — a standing check across visible schedules: which have degraded, which chains page through them, and whether that has been acknowledged. |
@@ -546,7 +545,8 @@ needs no channel, because the person is the boundary.
 | GET | `/api/v1/alert-groups` |
 | GET | `/api/v1/alert-groups/{id}` |
 | GET | `/api/v1/alert-groups/{id}/timeline` |
-| POST | `/api/v1/alert-groups/{id}/acknowledge`, `/resolve` |
+| POST | `/api/v1/alert-groups/{id}/acknowledge`, `/unacknowledge`, `/resolve`, `/unresolve` |
+| POST | `/api/v1/alert-groups/{id}/silence` — body or `?duration_minutes=` (default 60; `0` or less means no end) |
 | POST | `/api/v1/alert-groups/bulk-resolve`, `/bulk-acknowledge`, `/bulk-silence` |
 
 The bulk endpoints take `{"group_ids": ["...", "..."]}`. `bulk-silence` also
@@ -557,7 +557,10 @@ The responses carry `silenced`/`acknowledged`/`resolved`, `not_found` and
 A silence with a duration ends on its own: at `silenced_until` the worker returns
 the group to `open` and runs its escalation chain again from the first step, as it
 does when a maintenance window ends. `POST /api/v1/alert-groups/{id}/unacknowledge`
-also runs the chain again from the first step.
+also runs the chain again from the first step. `POST /api/v1/alert-groups/{id}/unresolve`
+reopens a resolved group: it returns to `open`, starts a new episode (the first
+one's response times are not overwritten) and runs the chain from the first step
+at once, without waiting for the poll interval.
 
 ### Alerts, notifications, history, debugging
 
@@ -566,6 +569,7 @@ also runs the chain again from the first step.
 | GET | `/api/v1/alerts`, `/api/v1/notifications` |
 | GET | `/api/v1/delivery-attempts?notification_id=<id>&limit=&offset=` (paginated like the other lists) |
 | GET | `/api/v1/history?from=&to=&integration=&severity=&status=&channel=&user=&team=` |
+| GET | `/api/v1/insights/summary?from=&to=&integration_id=` — what the Insights page draws: groups by status and level, notifications by state and a daily trend (`opened`, `resolved`, `delivered`, `failed`). The last 7 days by default, 92 at most |
 | POST | `/api/v1/routes/debug/{key}` — preview routing and notifications for a payload |
 | POST | `/api/v1/escalations/run` — run a pass over due escalations by hand |
 
@@ -576,6 +580,7 @@ also runs the chain again from the first step.
 | GET | `/api/v1/readiness` — is this installation capable of waking anybody at all? |
 | POST | `/api/v1/readiness/acknowledge` — accept the current blockers (admin) |
 | POST | `/api/v1/backups/report` — record a completed backup (admin; see [BACKUP_RESTORE.md](BACKUP_RESTORE.md)) |
+| GET | `/api/v1/capabilities` — the `edition`, and the features that depend on the edition or on configuration (`sso`, `team_scoping`, `analytics_stream`), each `available`, `not_configured` (configure it and it works) or `unavailable_in_edition` (no setting will help), with a sentence in `detail` |
 
 The report runs ten checks — database, worker, integrations, routing,
 notification targets, schedule coverage, the team boundary, channel policy,

@@ -55,6 +55,7 @@ import {
   type User,
 } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState, RowActions} from '../components/common';
+import { ListPager, ListSearch, usePagedList } from '../components/PagedList';
 import {
   EMPTY_STEP,
   cleanPolicies,
@@ -72,6 +73,7 @@ export function UsersPage() {
   const roleLabel = useRoleLabel();
   const channelLabel = useChannelLabel();
   const users = useFullList('users');
+  const rows = usePagedList(users.data?.items, ['name', 'username', 'email']);
   const remove = useDelete('users');
   const toggleDuty = useToggleDuty();
   const [editing, setEditing] = useState<User | null>(null);
@@ -92,12 +94,13 @@ export function UsersPage() {
       />
 
       <Paper withBorder>
+        <ListSearch list={rows} />
         <QueryState
           query={users}
           isEmpty={(data) => data.items.length === 0}
           emptyLabel={t('users.empty')}
         >
-          {(data) => (
+          {() => (
             <Table.ScrollContainer minWidth={900}>
               <Table highlightOnHover verticalSpacing="sm">
                 <Table.Thead>
@@ -113,7 +116,7 @@ export function UsersPage() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {data.items.map((user) => (
+                  {rows.items.map((user) => (
                     <Table.Tr key={user.id}>
                       <Table.Td>
                         <Stack gap={0}>
@@ -235,6 +238,7 @@ export function UsersPage() {
             </Table.ScrollContainer>
           )}
         </QueryState>
+        <ListPager list={rows} />
       </Paper>
 
       <UserModal opened={creating} onClose={() => setCreating(false)} />

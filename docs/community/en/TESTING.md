@@ -1,7 +1,5 @@
 # Testing
 
-*Русская версия: [TESTING.md](../ru/TESTING.md)*
-
 The project is checked at four levels: fast unit and static checks, integration
 against PostgreSQL, browser scenarios, and finally deployment and disaster
 recovery in kind. The list of test files changes faster than documentation does;

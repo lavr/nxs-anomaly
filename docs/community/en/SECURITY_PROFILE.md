@@ -1,7 +1,5 @@
 # The production security profile
 
-*Русская версия: [SECURITY_PROFILE.md](../ru/SECURITY_PROFILE.md)*
-
 `NXS_ANOMALY_PROFILE=production` moves every security-related default to its safe
 value with one switch, so that a hardened installation does not depend on whether
 somebody remembered a dozen separate flags. **Every value below can still be

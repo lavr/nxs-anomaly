@@ -1,7 +1,5 @@
 # Installation
 
-*Русская версия: [INSTALLATION.md](../ru/INSTALLATION.md)*
-
 Choose **one** method. Docker Compose is the shortest path: it starts PostgreSQL,
 the API, worker and web interface together.
 

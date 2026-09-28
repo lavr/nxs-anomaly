@@ -16,6 +16,7 @@ import { IconPlus } from '@tabler/icons-react';
 import { useAllOf, useCreate, useDelete, useFullList } from '../api/hooks';
 import type { MaintenanceWindow } from '../api/types';
 import { AbsoluteTime, ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
+import { ListPager, ListSearch, usePagedList } from '../components/PagedList';
 import { useI18n } from '../i18n/I18nProvider';
 
 /**
@@ -26,6 +27,7 @@ import { useI18n } from '../i18n/I18nProvider';
 export function MaintenancePage() {
   const { t } = useI18n();
   const windows = useFullList('maintenance-windows');
+  const rows = usePagedList(windows.data?.items, ['name']);
   const remove = useDelete('maintenance-windows');
   const integrations = useAllOf('integrations');
   const [creating, setCreating] = useState(false);
@@ -47,12 +49,13 @@ export function MaintenancePage() {
       />
 
       <Paper withBorder>
+        <ListSearch list={rows} />
         <QueryState
           query={windows}
           isEmpty={(data) => data.items.length === 0}
           emptyLabel={t('maintenance.empty')}
         >
-          {(data) => (
+          {() => (
             <Table.ScrollContainer minWidth={800}>
               <Table highlightOnHover verticalSpacing="sm">
                 <Table.Thead>
@@ -66,7 +69,7 @@ export function MaintenancePage() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {data.items.map((window) => (
+                  {rows.items.map((window) => (
                     <Table.Tr key={window.id}>
                       <Table.Td>
                         <StateBadge window={window} />
@@ -120,6 +123,7 @@ export function MaintenancePage() {
             </Table.ScrollContainer>
           )}
         </QueryState>
+        <ListPager list={rows} />
       </Paper>
 
       <CreateWindowModal opened={creating} onClose={() => setCreating(false)} />

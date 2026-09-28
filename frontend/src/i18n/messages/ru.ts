@@ -308,6 +308,10 @@ export const ru: Messages = {
   'shortcuts.sidebar': 'Свернуть или развернуть меню',
   'palette.placeholder': 'Страница или команда…',
   'palette.noMatches': 'Ничего не найдено',
+  'list.search': 'Поиск по имени',
+  'list.total': 'Всего: {total}',
+  'list.matching': '{matching} из {total}',
+  'list.noMatches': 'Ничего не найдено по запросу «{query}»',
   'palette.moveHint': 'перемещение',
   'palette.openHint': 'открыть',
 

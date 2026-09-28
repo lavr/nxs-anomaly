@@ -1,7 +1,5 @@
 # Backup, restore, upgrade and rollback
 
-*Русская версия: [BACKUP_RESTORE.md](../ru/BACKUP_RESTORE.md)*
-
 All of nxs-anomaly's persistent state lives in **one PostgreSQL database** —
 alerts, alert groups, users, schedules, escalation chains, integrations,
 notification state and the append-only audit trail. The application keeps state

@@ -17,6 +17,7 @@ import { IconCalendarPlus, IconSettings } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
 import { useAllOf, useCreate, useDelete, useFullList, useScheduleCoverage } from '../api/hooks';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
+import { ListPager, ListSearch, usePagedList } from '../components/PagedList';
 import type { ScheduleCoverageItem } from '../api/types';
 import { useI18n } from '../i18n/I18nProvider';
 import { EMPTY_VALUE } from '../i18n/format';
@@ -24,6 +25,7 @@ import { EMPTY_VALUE } from '../i18n/format';
 export function SchedulesPage() {
   const { t } = useI18n();
   const schedules = useFullList('schedules');
+  const rows = usePagedList(schedules.data?.items, ['name']);
   const teams = useAllOf('teams');
   const coverage = useScheduleCoverage();
   const remove = useDelete('schedules');
@@ -48,12 +50,13 @@ export function SchedulesPage() {
       />
 
       <Paper withBorder>
+        <ListSearch list={rows} />
         <QueryState
           query={schedules}
           isEmpty={(data) => data.items.length === 0}
           emptyLabel={t('schedules.empty')}
         >
-          {(data) => (
+          {() => (
             <Table highlightOnHover verticalSpacing="sm">
               <Table.Thead>
                 <Table.Tr>
@@ -67,7 +70,7 @@ export function SchedulesPage() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {data.items.map((schedule) => (
+                {rows.items.map((schedule) => (
                   <Table.Tr key={schedule.id}>
                     <Table.Td>
                       <Group gap={6}>
@@ -133,6 +136,7 @@ export function SchedulesPage() {
             </Table>
           )}
         </QueryState>
+        <ListPager list={rows} />
       </Paper>
 
       <CreateScheduleModal opened={creating} onClose={() => setCreating(false)} />

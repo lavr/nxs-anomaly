@@ -1,7 +1,5 @@
 # Configuration: from an empty installation to working alerting
 
-*Русская версия: [CONFIGURATION.md](../ru/CONFIGURATION.md)*
-
 A practical guide: what to create, and in what order, so that an alert arriving on
 a webhook wakes the person on call.
 

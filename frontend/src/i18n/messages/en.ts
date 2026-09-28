@@ -308,6 +308,10 @@ export const en = {
   'shortcuts.sidebar': 'Collapse or expand the menu',
   'palette.placeholder': 'Go to a page or run a command…',
   'palette.noMatches': 'Nothing matches',
+  'list.search': 'Search by name',
+  'list.total': '{total} in all',
+  'list.matching': '{matching} of {total}',
+  'list.noMatches': 'Nothing matches “{query}”',
   'palette.moveHint': 'to move',
   'palette.openHint': 'to open',
 

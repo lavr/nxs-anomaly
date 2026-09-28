@@ -1,7 +1,5 @@
 # A proxy for outbound delivery
 
-*Русская версия: [PROXY.md](../ru/PROXY.md)*
-
 This document is about one question: **how to send notifications when the
 provider is unreachable from the network the service runs in**. A blocked
 messenger, egress permitted only through one audited hop, a cluster closed to the

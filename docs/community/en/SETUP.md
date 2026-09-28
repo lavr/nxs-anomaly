@@ -1,7 +1,5 @@
 # Setup
 
-*Русская версия: [SETUP.md](../ru/SETUP.md)*
-
 Getting `nxs-anomaly` running locally, and the settings you meet on the way.
 For prepared env files, systemd, Compose and Kubernetes, start with
 [Installation](INSTALLATION.md).
@@ -133,6 +131,34 @@ run it only when you mean to discard whatever is already there.
 | `run-escalations` | one escalation pass, then exit |
 | `seed-demo` | migrations plus a demo installation to look at |
 | `healthcheck --url` | probe an endpoint; this is what the image's HEALTHCHECK runs |
+| `print-state` | every collection as JSON |
+| `history` | alert group history (`--limit`, `--severity`, `--status`, `--integration`, `--from`, `--to`) |
+| `alerts` | normalized alerts (`--limit`, `--status`, `--severity`, `--integration`) |
+| `notifications` | notifications (`--limit`, `--status`, `--user`, `--group`) |
+
+`serve` takes `--host`, `--port`, `--poll-interval`, `--no-scheduler`, `--api-key`,
+`--tls-cert` and `--tls-key`; `run-worker` takes `--poll-interval`, `--once` and
+`--worker-addr`. Each flag overrides the environment variable of the same meaning.
+
+## Server
+
+| Variable | Default | |
+|---|---|---|
+| `NXS_ANOMALY_LISTEN_HOST` | `0.0.0.0` | listen address |
+| `NXS_ANOMALY_LISTEN_PORT` | `8080` | listen port |
+| `NXS_ANOMALY_ADDR` | — | the whole `host:port`; overrides the two above |
+| `NXS_ANOMALY_WORKER_ADDR` | `:8081` | where `run-worker` serves `/live`, `/ready` and `/metrics` |
+| `NXS_ANOMALY_TLS_CERT` / `_KEY` | — | serve HTTPS directly; usually TLS ends at the ingress instead |
+| `NXS_ANOMALY_START_SCHEDULER` | `true` | `false` — `serve` runs no worker cycle; run `run-worker` separately |
+| `NXS_ANOMALY_POLL_INTERVAL` | `5` | seconds between worker cycles when nothing wakes it; an ingest wakes the worker at once through PostgreSQL `LISTEN/NOTIFY` |
+| `NXS_ANOMALY_WORKER_CYCLE_TIMEOUT_SECONDS` | — (off) | a deadline for one worker cycle; unset or `0` means none — a large delivery backlog can legitimately take long |
+| `NXS_ANOMALY_SHUTDOWN_TIMEOUT` | `10` | seconds to finish requests in flight on SIGTERM |
+| `NXS_ANOMALY_HTTP_READ_HEADER_TIMEOUT_SECONDS` | `5` | time to read request headers (slowloris protection) |
+| `NXS_ANOMALY_HTTP_READ_TIMEOUT_SECONDS` | `15` | time to read a whole request |
+| `NXS_ANOMALY_HTTP_WRITE_TIMEOUT_SECONDS` | `30` | time to write a response |
+| `NXS_ANOMALY_HTTP_IDLE_TIMEOUT_SECONDS` | `60` | keep-alive idle connection |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`. `debug` adds the diagnostic lines (`escalation_skipped`, `delivery_attempt` and others) |
+| `LOG_FORMAT` | `text` | `text` or `json` |
 
 ## Database
 
@@ -161,6 +187,8 @@ Connection pool:
 | `NXS_ANOMALY_DB_POOL_MIN` | `1` | idle connections kept; `0` keeps none |
 | `NXS_ANOMALY_DB_POOL_MAX_CONN_LIFETIME_SECONDS` | `3600` | shed connections after a failover or through a load balancer |
 | `NXS_ANOMALY_DB_STATEMENT_TIMEOUT_SECONDS` | `30` | per-connection `statement_timeout`; migrations are exempt. `0` sends no `statement_timeout` at all — required behind PgBouncer, which rejects startup parameters it is not told to ignore |
+| `NXS_ANOMALY_DB_POOL_MAX_CONN_IDLE_SECONDS` | `1800` | close a connection idle this long |
+| `NXS_ANOMALY_DB_POOL_HEALTHCHECK_SECONDS` | `60` | how often idle connections are checked |
 | `NXS_ANOMALY_DB_CONNECT_MAX_WAIT_SECONDS` | `0` | retry the first connection for N seconds. Set it above zero under Kubernetes: the pod may start before the database accepts connections |
 
 `0` is accepted only where the table says what it means. For the pool size, the
@@ -205,9 +233,40 @@ shows the button disabled on the sign-in screen rather than hiding it, and
 | `NXS_ANOMALY_WORKER_HEARTBEAT_URL` | an external dead-man's switch (healthchecks.io, Cronitor, an Uptime Kuma push monitor). The worker sends it a `GET` after a successful cycle, at most once a minute; when the pings stop, the worker, its database or the network is down. See [ALERTING_RULES.md](ALERTING_RULES.md) |
 | `NXS_ANOMALY_NOTIFY_ON_RESOLVE` | `false`. With it on, whoever was woken is told the alert closed — the recipients come from the group, not from who happens to be on call now |
 
-Provider credentials — SMTP, Telegram, Slack, Mattermost, Asterisk — and the
-outbound proxy settings are their own subject; they are covered in the
-configuration reference.
+Provider credentials for email, Telegram, Slack and Mattermost are covered with
+the channels themselves in [CONFIGURATION.md](CONFIGURATION.md) — §7 for SMTP,
+§8 for the chat bots — and the outbound proxy in its §9 and in
+[PROXY.md](PROXY.md).
+
+### Phone calls (Asterisk)
+
+The `call` channel originates a call through the Asterisk Manager Interface
+(AMI, always port `5038`). Without an instance a `call` notification is
+`skipped`.
+
+| Variable | Default | |
+|---|---|---|
+| `NXS_ANOMALY_ASTERISK_HOST` | — | AMI host name, without a port |
+| `NXS_ANOMALY_ASTERISK_USERNAME` / `_SECRET` | — | AMI credentials |
+| `NXS_ANOMALY_ASTERISK_CHANNEL` | — | e.g. `SIP/trunk/`; the phone number is appended to it |
+| `NXS_ANOMALY_ASTERISK_CONTEXT` / `_EXTEN` | — | where the answered call goes in your dialplan |
+| `NXS_ANOMALY_ASTERISK_PRIORITY` | `1` | dialplan priority |
+| `NXS_ANOMALY_ASTERISK_CALLER_ID` | `nxs-anomaly` | caller ID shown on the phone |
+| `NXS_ANOMALY_ASTERISK_TRIGGER_VARIABLE` | `TRIGGER_MESSAGE` | channel variable that carries the alert text into the dialplan |
+
+`HOST`, `USERNAME`, `SECRET`, `CHANNEL`, `CONTEXT` and `EXTEN` are all
+required; with any of them missing the call fails with `settings incomplete`.
+For several PBXes, number the same variables from zero —
+`NXS_ANOMALY_ASTERISK_0_HOST`, `NXS_ANOMALY_ASTERISK_1_HOST` and so on, with no
+gaps: the first missing number ends the list. A call tries them in order until
+one succeeds. Once `…_0_HOST` is set, the unnumbered variables are not read.
+
+### Mobile push relay
+
+| Variable | |
+|---|---|
+| `NXS_ANOMALY_MOBILE_PUSH_URL` | your relay that turns a notification into a real push. Without it the `mobile` channel has no transport and its notifications are `skipped`, not `delivered`. A phone paired through the app does not need it: it holds the event stream open instead (see [API.md](API.md)) |
+| `NXS_ANOMALY_MOBILE_PUSH_TOKEN` | optional `Authorization: Bearer` for the relay |
 
 ## Hardening
 
@@ -234,6 +293,11 @@ Two that are worth knowing by name:
   list to the proxies you actually run if clients reach the API from a private
   network.
 - `NXS_ANOMALY_EGRESS_ALLOWLIST` — hostnames and CIDRs delivery may reach at all.
+- `NXS_ANOMALY_CIRCUIT_BREAKER_THRESHOLD` — consecutive failures on one channel and
+  target before delivery to it is short-circuited (`0`, the default, turns the
+  breaker off; `5` under the production profile), and
+  `NXS_ANOMALY_CIRCUIT_BREAKER_COOLDOWN_SECONDS` (`30`) — how long it stays open
+  before a trial call.
 - `NXS_ANOMALY_REOPEN_ACKED_ON_NEW_ALERT=true` — a new alert on an acknowledged
   group takes it back to `open` and runs the chain from step zero. Off by
   default: a repeat firing does not undo an acknowledgement. See

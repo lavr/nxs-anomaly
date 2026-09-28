@@ -1,7 +1,5 @@
 # Processing an alert: parsing, enrichment, templates, removal
 
-*Русская версия: [ALERT_PROCESSING.md](../ru/ALERT_PROCESSING.md)*
-
 What happens to an alert between the moment a webhook accepts it and the text a
 woken person reads — and where along that path data is added, and where it is
 removed.

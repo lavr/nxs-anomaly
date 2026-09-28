@@ -1,7 +1,5 @@
 # Personal data inventory
 
-*Русская версия: [DATA_INVENTORY.md](../ru/DATA_INVENTORY.md)*
-
 What nxs-anomaly holds about people, where exactly, what bounds it in time, and
 what can be done with it when somebody asks.
 

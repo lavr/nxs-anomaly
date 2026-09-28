@@ -1,7 +1,5 @@
 # Deployment
 
-*Русская версия: [DEPLOY.md](../ru/DEPLOY.md)*
-
 `nxs-anomaly` is a Go binary that talks to PostgreSQL. It can run as one process
 with the scheduler built in, or as separate API and worker processes.
 
@@ -384,6 +382,23 @@ instance:
 | `nxs_anomaly_oldest_due_escalation_age_seconds` | gauge | age of the oldest overdue group |
 | `nxs_anomaly_oldest_pending_delivery_age_seconds` | gauge | age of the oldest `delivery_scheduled` |
 | `nxs_anomaly_stale_claims_reclaimed_total` | counter | abandoned claims reclaimed (a worker crash, or too short a claim timeout) |
+| `nxs_anomaly_worker_cycles_skipped_total` | counter | cycles skipped because the previous one was still running — the worker is not keeping up |
+| `nxs_anomaly_worker_cycle_stage_duration_seconds` | histogram | worker cycle latency per stage (`stage`) |
+| `nxs_anomaly_worker_panics_total` | counter | panics recovered in worker goroutines, per stage (`stage`) |
+| `nxs_anomaly_ingest_duration_seconds` | histogram | ingest latency per source (`source`) |
+| `nxs_anomaly_ingest_errors_total` | counter | ingest errors per source (`source`) |
+| `nxs_anomaly_http_request_duration_seconds` | histogram | HTTP latency per category (`handler`) |
+| `nxs_anomaly_http_requests_total` | counter | HTTP requests per category and status (`handler`, `code`) |
+| `nxs_anomaly_http_panics_recovered_total` | counter | panics recovered in HTTP handlers |
+| `nxs_anomaly_delivery_errors_by_provider_total` | counter | delivery errors per channel (`provider`) |
+| `nxs_anomaly_notification_delivery_duration_seconds` | histogram | provider call latency per channel (`channel`) |
+| `nxs_anomaly_dead_letter_events_total` | counter | notifications that failed permanently, per channel (`channel`) |
+| `nxs_anomaly_delivery_short_circuited_total` | counter | deliveries skipped by an open circuit breaker, per channel (`channel`) |
+| `nxs_anomaly_db_pool_acquired_conns` | gauge | pool connections in use right now |
+| `nxs_anomaly_db_pool_idle_conns` | gauge | idle pool connections |
+| `nxs_anomaly_db_pool_total_conns` | gauge | all pool connections |
+| `nxs_anomaly_db_pool_max_conns` | gauge | the pool's maximum (`NXS_ANOMALY_DB_POOL_MAX`) |
+| `nxs_anomaly_db_pool_empty_acquire_total` | counter | connection requests that waited for an exhausted pool (growth means the pool is small or the database is not keeping up) |
 
 The worker and the API export the same set, the worker on its own port (`:8081`
 by default). The delivery metrics are produced by the worker, so with the split
