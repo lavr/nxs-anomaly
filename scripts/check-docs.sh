@@ -35,11 +35,10 @@ fail() {
 }
 ok() { printf 'check-docs ok    %s\n' "$1"; }
 
-# The Russian enterprise set is the source of truth for prose: the community
-# Russian set is generated from it, and the English sets are translated from it.
-# Checking the source is what keeps every derived copy honest, and checking the
-# English ones as they appear is what keeps a translation from outliving the
-# thing it describes.
+# The Russian enterprise set is the source of truth for prose, and the
+# community English set is translated from it. Checking the source is what keeps
+# the translation honest, and checking the English one as it appears is what
+# keeps a translation from outliving the thing it describes.
 #
 # This script also ships into the community tree unchanged (it is not one of
 # the enterprise-only paths make-community.sh removes), and CONTRIBUTING.md
@@ -48,12 +47,11 @@ ok() { printf 'check-docs ok    %s\n' "$1"; }
 # without this a contributor's very first run would fail on paths the cut
 # deleted, not on anything they wrote.
 DOCS=(README.md SECURITY.md CONTRIBUTING.md CHANGELOG.md
-      docs/enterprise/ru/*.md docs/community/ru/*.md
-      docs/enterprise/en/*.md docs/community/en/*.md)
+      docs/enterprise/ru/*.md docs/enterprise/en/*.md docs/community/en/*.md)
 if [ -d docs/enterprise/ru ]; then
-  DOCS_RU_SRC=docs/enterprise/ru
+  DOCS_SRC=docs/enterprise/ru
 else
-  DOCS_RU_SRC=docs/community/ru
+  DOCS_SRC=docs/community/en
 fi
 
 # ── 1. Every migration has a row in docs/MIGRATIONS.md ───────────────────────
@@ -62,8 +60,8 @@ fi
 missing_migrations=0
 for f in internal/store/migrations/*.sql; do
   version="$(basename "${f}" .sql)"
-  if ! grep -q "${version}" "${DOCS_RU_SRC}/MIGRATIONS.md"; then
-    fail "migration ${version} has no row in ${DOCS_RU_SRC}/MIGRATIONS.md"
+  if ! grep -q "${version}" "${DOCS_SRC}/MIGRATIONS.md"; then
+    fail "migration ${version} has no row in ${DOCS_SRC}/MIGRATIONS.md"
     missing_migrations=$((missing_migrations + 1))
   fi
 done
@@ -74,7 +72,7 @@ done
 # querying a name that returns nothing. Index names (…_idx) are not metrics.
 grep -rhoE 'Name:\s*"nxs_anomaly_[a-z0-9_]+"' --include=metrics.go internal/ \
   | grep -oE 'nxs_anomaly_[a-z0-9_]+' | sort -u > "${WORK}/metrics_code.txt"
-grep -rhoE 'nxs_anomaly_[a-z0-9_]+' docs/prometheus-rules.yaml docs/grafana-dashboard.json "${DOCS_RU_SRC}/ALERTING_RULES.md" \
+grep -rhoE 'nxs_anomaly_[a-z0-9_]+' docs/prometheus-rules.yaml docs/grafana-dashboard.json "${DOCS_SRC}/ALERTING_RULES.md" \
   | sed -E 's/_(bucket|sum|count)$//' \
   | grep -vE '_idx$' \
   | sort -u > "${WORK}/metrics_docs.txt"
@@ -99,13 +97,13 @@ grep -rhoiE 'CREATE TABLE (IF NOT EXISTS )?nxs_anomaly_[a-z0-9_]+' internal/stor
 # or an index — there is no prose to guess at. A looser "is this word near the
 # word 'table'" heuristic was tried first and missed the very defect that
 # prompted the check, so this one is exact instead of clever.
-grep -ohE 'nxs_anomaly_[a-z0-9_]+' "${DOCS_RU_SRC}/MIGRATIONS.md" \
+grep -ohE 'nxs_anomaly_[a-z0-9_]+' "${DOCS_SRC}/MIGRATIONS.md" \
   | grep -vE '_idx$' | sort -u > "${WORK}/tables_docs.txt"
 bad_tables=0
 while read -r name; do
   [ -z "${name}" ] && continue
   if ! grep -qx "${name}" "${WORK}/tables_code.txt"; then
-    fail "table ${name} is named in ${DOCS_RU_SRC}/MIGRATIONS.md but no migration creates it"
+    fail "table ${name} is named in ${DOCS_SRC}/MIGRATIONS.md but no migration creates it"
     bad_tables=$((bad_tables + 1))
   fi
 done < "${WORK}/tables_docs.txt"
@@ -126,26 +124,11 @@ for doc in "${DOCS[@]}"; do
       fi
     done
 done > "${WORK}/links.txt"
-pending=0
 while IFS='|' read -r _ doc target; do
   [ -n "${target}" ] || continue
-  # A link from an English document to a sibling that exists in Russian is not
-  # broken, it is not translated yet: the file lands under the same name when the
-  # translation does. Counted and reported by scripts/check-docs-parity.sh rather
-  # than failed here, so that a half-translated set is a number somebody watches
-  # instead of a permanently red gate people learn to ignore.
-  case "${doc}" in
-    docs/community/en/*)
-      if [ -e "docs/community/ru/${target}" ]; then
-        pending=$((pending + 1))
-        continue
-      fi
-      ;;
-  esac
   fail "${doc} links to ${target}, which does not exist"
   broken_links=$((broken_links + 1))
 done < "${WORK}/links.txt"
-[ "${pending:-0}" = 0 ] || echo "check-docs note  ${pending} link(s) point at documents awaiting translation"
 [ "${broken_links}" -eq 0 ] && ok "every relative documentation link resolves"
 
 # ── 5. The ingest URL shape in the docs matches the routes ──────────────────

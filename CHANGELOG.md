@@ -4,6 +4,54 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.9] — 2026-09-28
+
+### Changed
+- **The Community edition's documentation is English only.** The Russian set
+  (`docs/community/ru`) and every link to it are gone from the community tree;
+  the interface still ships in both languages. The Enterprise documentation
+  stays in Russian.
+- **The Community README is rewritten.** Two tables say when Community fits
+  and when Enterprise does; the roadmap lists what is coming in each edition;
+  feedback points at Telegram, email, the product page and the community
+  channels.
+
+### Documentation
+- **Both editions' documentation checked against the code of 1.9.8.**
+  - Five endpoints the server answers were in neither API guide:
+    `/api/v1/on-call`, `/api/v1/capabilities`, `/api/v1/insights/summary`, and
+    `/unresolve` and `/silence` on one alert group.
+  - Nineteen metrics were missing from the metrics tables in DEPLOY.md — the
+    ingest, HTTP, delivery, panic and connection-pool ones.
+  - Community's SETUP.md pointed at a configuration reference that did not
+    exist: it now covers the listen address, TLS, HTTP timeouts, logging,
+    Asterisk calls, the mobile push relay and the circuit-breaker cooldown.
+  - Several Asterisk PBXes are numbered from `0` without gaps; the README said
+    from `1`, and a list started at `1` is ignored.
+  - The Enterprise README names the Terraform Registry as where the provider is
+    published and lists the mobile app, `run-report` and
+    `run-worker --worker-addr`. The Community README lists all seven ingest
+    sources.
+  - Several links still pointed at `docs/API.md` and `docs/CONFIGURATION.md`
+    from before the edition split.
+
+## [1.9.8] — 2026-09-28
+
+### Fixed
+- **Long list pages open in under a second and answer a click in half a
+  second.** Since 1.9.7 the Users, Integrations, Escalation chains, Teams,
+  Schedules and Maintenance pages read every item, and they drew every one of
+  them: on a sandbox with 624 people the Users page took 3–4.6 s to appear and
+  6 s to show a duty toggle — the API answered in 0.05 s, the rest was drawing
+  rows, and every change redrew all of them. The pages now draw 50 rows at a
+  time with pages below, and a search by name above the list finds any item
+  in the whole collection; the count of all items is shown next to it. On the
+  same data: 0.8 s to appear, 0.6 s for a duty toggle, 0.1 s for a search.
+  Lists of 50 or fewer look as before.
+- The test added in 1.9.7 for reading every page rendered 1001 users in jsdom
+  and took over 20 s on a busy machine, failing the vitest step; the paging is
+  now tested on the hooks themselves.
+
 ## [1.9.7] — 2026-09-27
 
 ### Fixed

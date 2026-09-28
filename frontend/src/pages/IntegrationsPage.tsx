@@ -19,6 +19,7 @@ import { Link } from 'react-router-dom';
 import { useAllOf, useCreate, useDelete, useFullList } from '../api/hooks';
 import { INTEGRATION_TYPES, type Integration } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
+import { ListPager, ListSearch, usePagedList } from '../components/PagedList';
 import { useI18n } from '../i18n/I18nProvider';
 import { EMPTY_VALUE } from '../i18n/format';
 
@@ -53,6 +54,7 @@ export function CopyField({ value }: { value: string }) {
 export function IntegrationsPage() {
   const { t } = useI18n();
   const integrations = useFullList('integrations');
+  const rows = usePagedList(integrations.data?.items, ['name']);
   const remove = useDelete('integrations');
   const [creating, setCreating] = useState(false);
 
@@ -69,13 +71,14 @@ export function IntegrationsPage() {
       />
 
       <Paper withBorder>
+        <ListSearch list={rows} />
         <QueryState
           query={integrations}
           isEmpty={(data) => data.items.length === 0}
           emptyLabel={t('integrations.empty')}
 
         >
-          {(data) => (
+          {() => (
             <Table.ScrollContainer minWidth={900}>
               <Table highlightOnHover verticalSpacing="sm">
                 <Table.Thead>
@@ -88,7 +91,7 @@ export function IntegrationsPage() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {data.items.map((integration) => (
+                  {rows.items.map((integration) => (
                     <Table.Tr key={integration.id}>
                       <Table.Td>
                         <Stack gap={2}>
@@ -145,6 +148,7 @@ export function IntegrationsPage() {
             </Table.ScrollContainer>
           )}
         </QueryState>
+        <ListPager list={rows} />
       </Paper>
 
       <CreateIntegrationModal opened={creating} onClose={() => setCreating(false)} />

@@ -1,7 +1,5 @@
 # Capacity and chaos envelope
 
-*Русская версия: [CAPACITY.md](../ru/CAPACITY.md)*
-
 How to measure what nxs-anomaly can take, and to confirm that under beta load it
 holds its targets and loses no notifications when things break. The harness and
 the acceptance rules live in

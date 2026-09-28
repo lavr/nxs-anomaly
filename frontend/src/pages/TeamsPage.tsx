@@ -17,12 +17,14 @@ import { IconPencil, IconUsersPlus } from '@tabler/icons-react';
 import { useAllOf, useCreate, useDelete, useFullList, useUpdate } from '../api/hooks';
 import type { Team } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
+import { ListPager, ListSearch, usePagedList } from '../components/PagedList';
 import { EMPTY_VALUE } from '../i18n/format';
 import { useI18n } from '../i18n/I18nProvider';
 
 export function TeamsPage() {
   const { t } = useI18n();
   const teams = useFullList('teams');
+  const rows = usePagedList(teams.data?.items, ['name']);
   const users = useAllOf('users');
   const remove = useDelete('teams');
   const [editing, setEditing] = useState<Team | null>(null);
@@ -43,12 +45,13 @@ export function TeamsPage() {
       />
 
       <Paper withBorder>
+        <ListSearch list={rows} />
         <QueryState
           query={teams}
           isEmpty={(data) => data.items.length === 0}
           emptyLabel={t('teams.empty')}
         >
-          {(data) => (
+          {() => (
             <Table highlightOnHover verticalSpacing="sm">
               <Table.Thead>
                 <Table.Tr>
@@ -58,7 +61,7 @@ export function TeamsPage() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {data.items.map((team) => (
+                {rows.items.map((team) => (
                   <Table.Tr key={team.id}>
                     <Table.Td>
                       <Group gap={6}>
@@ -105,6 +108,7 @@ export function TeamsPage() {
             </Table>
           )}
         </QueryState>
+        <ListPager list={rows} />
       </Paper>
 
       <TeamModal opened={creating} onClose={() => setCreating(false)} />

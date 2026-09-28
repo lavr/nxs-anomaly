@@ -307,8 +307,7 @@ Report vulnerabilities privately through the
 Documentation improvements and code contributions are welcome; read
 [CONTRIBUTING.md](https://github.com/nixys/nxs-anomaly/blob/main/CONTRIBUTING.md).
 Documentation is available in
-[English](https://github.com/nixys/nxs-anomaly/tree/main/docs/community/en) and
-[Russian](https://github.com/nixys/nxs-anomaly/tree/main/docs/community/ru).
+[English](https://github.com/nixys/nxs-anomaly/tree/main/docs/community/en).
 
 ## License
 

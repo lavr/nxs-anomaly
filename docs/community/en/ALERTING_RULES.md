@@ -1,7 +1,5 @@
 # Prometheus Alerting Rules
 
-*Русская версия: [ALERTING_RULES.md](../ru/ALERTING_RULES.md)*
-
 Example alerting rules for monitoring nxs-anomaly. Adapt the thresholds to your
 own load.
 

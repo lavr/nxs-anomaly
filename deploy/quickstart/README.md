@@ -1,8 +1,7 @@
 # Community installation presets
 
 These files belong to the same release as the checkout. Run commands from the
-repository root. Start with the [installation guide](../../docs/community/en/INSTALLATION.md)
-([на русском](../../docs/community/ru/INSTALLATION.md)).
+repository root. Start with the [installation guide](../../docs/community/en/INSTALLATION.md).
 
 | File | Purpose |
 |---|---|

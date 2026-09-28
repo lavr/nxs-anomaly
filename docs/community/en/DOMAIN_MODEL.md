@@ -1,7 +1,5 @@
 # The domain model
 
-*Русская версия: [DOMAIN_MODEL.md](../ru/DOMAIN_MODEL.md)*
-
 This document describes the main entities of `nxs-anomaly`, how they relate and
 how they live. It reflects the current Go runtime: the domain logic lives in
 `internal/engine`, storage in PostgreSQL through `internal/store`.
