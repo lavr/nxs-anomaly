@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.10] — 2026-09-30
+
+### Changed
+- **SSO keeps the name, phone and Telegram id current.** Every sign-in now
+  copies the `name`, `phone_number` and `telegram_id` claims onto the profile,
+  as it already did for role and e-mail. A claim the provider does not send, or
+  sends empty, leaves the local value alone, so a directory without phone
+  numbers does not wipe the ones entered in nxs-anomaly. `telegram_id` may be a
+  string or a JSON number.
+
 ## [1.9.9] — 2026-09-28
 
 ### Changed
