@@ -1,7 +1,7 @@
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuditPage } from './AuditPage';
 
@@ -52,7 +52,7 @@ function renderPage(items: ReturnType<typeof event>[]) {
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter>
           <AuditPage />
@@ -118,7 +118,7 @@ describe('AuditPage', () => {
     get.mockRejectedValue(new Error('audit query timed out'));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <MantineProvider>
+      <MantineProvider env="test">
         <QueryClientProvider client={client}>
           <MemoryRouter>
             <AuditPage />

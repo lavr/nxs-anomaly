@@ -9,7 +9,7 @@ import { StatTile } from './StatTile';
 describe('StatTile', () => {
   it('shows the first number that arrives after loading', () => {
     const tile = (value: number | undefined, loading: boolean) => (
-      <MantineProvider>
+      <MantineProvider env="test">
         <StatTile label="Open" value={value} loading={loading} />
       </MantineProvider>
     );

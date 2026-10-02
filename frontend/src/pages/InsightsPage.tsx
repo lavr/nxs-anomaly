@@ -10,7 +10,7 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAllOf, useHistory, useInsightsSummary } from '../api/hooks';
 import {
   AbsoluteTime,

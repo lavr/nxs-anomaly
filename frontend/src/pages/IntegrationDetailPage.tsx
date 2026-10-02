@@ -19,7 +19,7 @@ import {
   Title,
 } from '@mantine/core';
 import { IconArrowLeft, IconDeviceFloppy, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useAllOf, useDebugRoute, useItem, useRotateKey, useUpdate } from '../api/hooks';
 import {
   NOTIFICATION_TARGET_TYPES,

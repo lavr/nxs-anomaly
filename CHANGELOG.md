@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.13] — 2026-10-03
+
+### Security
+- **The expired `react-router` audit exception is resolved by upgrading, not
+  re-extending.** GHSA-qwww-vcr4-c8h2 (RSC-mode CSRF, react-router
+  7.12.0–8.2.0) was accepted until 2026-10-01 on the grounds that no fixed
+  version existed yet; one has since shipped. Frontend: `react-router-dom`
+  7.18.4 → `react-router` 8.4.0 (the package merged into `react-router` in
+  v8), which requires React 18.3.1 → 19.3.0 and its matching `@types/react(-dom)`.
+
+### Changed
+- **Frontend test and UI dependencies are current.** `@mantine/*` 7.17 → 9.6.3,
+  `vitest`/`@vitest/coverage-v8` 4.1 → 5.0.3, `jsdom` 25 → 29.1.1,
+  `@playwright/test` 1.61 → 1.63, plus in-range patch/minor bumps
+  (`@tanstack/react-query`, `@tabler/icons-react`, `dayjs`,
+  `@testing-library/react`/`user-event`, `@vitejs/plugin-react`, `vite`).
+  `typescript` stays on 5.9.3: `openapi-typescript` has no release yet
+  supporting TypeScript 6/7. Mantine 9 renamed `Collapse`'s `in` prop to
+  `expanded` and changed Select/MultiSelect's accessible role from `textbox`
+  to `combobox`; both are updated. Mantine's Popover/Combobox dropdowns now
+  go through Floating UI's `hide` middleware, which misreads jsdom's
+  zero-size layout as the reference being clipped and forces dropdowns
+  invisible to accessibility queries in tests — every test's `MantineProvider`
+  now sets `env="test"`, which Mantine documents specifically to disable that
+  check.
+
+## [1.9.12] — 2026-10-02
+
+### Fixed
+- **Deleting a person while their page is being delivered no longer stalls
+  everyone else's.** The deletion cascades to the notification being
+  delivered; saving the batch then wrote that row back, failed the foreign key
+  and rolled back the whole batch. The other pages in it stayed "delivering"
+  until the reaper (5 minutes or more) and were then sent a second time. A row
+  that is gone is now skipped. The same applies to a group archived mid-delivery
+  and to the retry path.
+- **A failed worker cycle is logged** (`worker_cycle_failed`). Until now only
+  the heartbeat saw the error, and it ignores failures, so a cycle that
+  delivered pages and could not record them left no trace.
+
 ## [1.9.11] — 2026-10-01
 
 ### Fixed

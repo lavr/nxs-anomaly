@@ -27,3 +27,10 @@ globalThis.ResizeObserver ??= class {
 // every test passes, vitest reports unhandled errors and exits non-zero, which
 // is exactly how this reached CI green-looking and failed there.
 Element.prototype.scrollIntoView ??= () => {};
+
+// jsdom implements no FontFaceSet; Mantine's autosizing Textarea listens for
+// 'loadingdone' on document.fonts to re-measure once web fonts settle.
+(document as { fonts?: FontFaceSet }).fonts ??= {
+  addEventListener: () => {},
+  removeEventListener: () => {},
+} as unknown as FontFaceSet;

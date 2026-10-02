@@ -9,7 +9,7 @@ import {
   Table,
   Text,
 } from '@mantine/core';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAllOf, useList } from '../api/hooks';
 import {
   AbsoluteTime,

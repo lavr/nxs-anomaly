@@ -259,6 +259,9 @@ func (srv *Server) runWorkerLoop(ctx context.Context) {
 		t0 := time.Now()
 		result, err := srv.eng.RunWorkerCycle(context.WithoutCancel(ctx))
 		srv.cycleRunning.Store(false)
+		if err != nil {
+			slog.Error("worker_cycle_failed", "error", err)
+		}
 		srv.metrics.recordCycle(time.Since(t0))
 		srv.metrics.updateOperationalGauges(srv.store)
 		applyCycleResult(srv.metrics, result)

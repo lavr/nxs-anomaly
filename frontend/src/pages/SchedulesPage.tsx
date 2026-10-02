@@ -14,7 +14,7 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { IconCalendarPlus, IconSettings } from '@tabler/icons-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAllOf, useCreate, useDelete, useFullList, useScheduleCoverage } from '../api/hooks';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
 import { ListPager, ListSearch, usePagedList } from '../components/PagedList';
