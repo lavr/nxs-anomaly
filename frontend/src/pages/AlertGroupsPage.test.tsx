@@ -2,7 +2,7 @@ import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AlertGroupsPage } from './AlertGroupsPage';
 
@@ -71,7 +71,7 @@ function renderPage(groups = [group('grp_1'), group('grp_2')], entries = ['/aler
 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={entries}>
           <AlertGroupsPage />
@@ -216,7 +216,7 @@ describe('AlertGroupsPage', () => {
 
     // Mantine's Select renders a visible input plus a hidden one behind the same
     // label, so the label alone is ambiguous.
-    await user.click(screen.getByRole('textbox', { name: 'Status' }));
+    await user.click(screen.getByRole('combobox', { name: 'Status' }));
     await user.click(await screen.findByRole('option', { name: 'acknowledged' }));
 
     await waitFor(() =>
@@ -239,7 +239,7 @@ describe('AlertGroupsPage', () => {
     renderPage();
     await screen.findByText('Incident grp_1');
 
-    await user.click(screen.getByRole('textbox', { name: 'Status' }));
+    await user.click(screen.getByRole('combobox', { name: 'Status' }));
     await user.click(await screen.findByRole('option', { name: 'acknowledged' }));
 
     await waitFor(() =>
@@ -285,7 +285,7 @@ describe('AlertGroupsPage', () => {
 
     expect(await screen.findByText('high')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('textbox', { name: 'Severity' }));
+    await user.click(screen.getByRole('combobox', { name: 'Severity' }));
     expect(await screen.findByRole('option', { name: 'error' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'high' })).toBeNull();
   });

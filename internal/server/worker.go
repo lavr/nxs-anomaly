@@ -67,6 +67,11 @@ func applyCycleResult(m *Metrics, result map[string]any) {
 func runWorkerCycleOnce(ctx context.Context, eng *engine.Engine, s store.PostgreSQLStore, m *Metrics) error {
 	t0 := time.Now()
 	result, err := eng.RunWorkerCycle(context.WithoutCancel(ctx))
+	if err != nil {
+		// Only the heartbeat saw this before, and it ignores failures: a cycle
+		// that delivered pages and then failed to record them left no trace.
+		slog.Error("worker_cycle_failed", "error", err)
+	}
 	m.recordCycle(time.Since(t0))
 	m.updateOperationalGauges(s)
 	applyCycleResult(m, result)

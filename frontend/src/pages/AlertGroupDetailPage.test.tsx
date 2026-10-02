@@ -1,7 +1,7 @@
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AlertGroupDetailPage } from './AlertGroupDetailPage';
 
@@ -63,7 +63,7 @@ function renderPage(notifications: ReturnType<typeof notification>[]) {
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={['/alert-groups/grp_1']}>
           <Routes>
@@ -125,7 +125,7 @@ function renderWithLogs(logs: unknown[]) {
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={['/alert-groups/grp_1']}>
           <Routes>

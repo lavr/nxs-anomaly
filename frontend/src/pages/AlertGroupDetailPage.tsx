@@ -22,7 +22,7 @@ import {
   IconBellOff,
   IconChevronDown,
 } from '@tabler/icons-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useAllOf, useGroupAction, useItem, useList, useSilenceGroup } from '../api/hooks';
 import type { ReactNode } from 'react';
 import type { AlertGroup, Notification } from '../api/types';
@@ -344,7 +344,7 @@ function Summary({ group }: { group: AlertGroup }) {
           <Button variant="subtle" size="compact-sm" onClick={details.toggle} px={0}>
             {showAll ? t('group.hideAllFields') : t('group.showAllFields')}
           </Button>
-          <Collapse in={showAll}>
+          <Collapse expanded={showAll}>
             <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} spacing="md" mt="sm">
               {secondary.map(([label, value]) => (
                 <Field key={label} label={label}>

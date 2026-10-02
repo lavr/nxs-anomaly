@@ -1,7 +1,7 @@
 import { MantineProvider } from '@mantine/core';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from './CommandPalette';
 
@@ -12,7 +12,7 @@ function LocationProbe() {
 
 function renderPalette(run = vi.fn()) {
   render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <MemoryRouter initialEntries={['/']}>
         <CommandPalette
           commands={[

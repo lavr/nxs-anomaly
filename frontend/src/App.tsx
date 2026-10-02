@@ -1,6 +1,6 @@
 import { Center, Loader } from '@mantine/core';
 import { Suspense, lazy } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router';
 import { EnterprisePage } from './pages/EnterprisePage';
 import { useAuth } from './auth/AuthProvider';
 import { SignInScreen } from './auth/SignInScreen';

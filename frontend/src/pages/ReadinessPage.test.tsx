@@ -1,7 +1,7 @@
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReadinessPage } from './ReadinessPage';
 
@@ -67,7 +67,7 @@ function renderPage(data: Record<string, unknown>) {
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter>
           <ReadinessPage />
@@ -127,7 +127,7 @@ describe('ReadinessPage', () => {
     get.mockRejectedValue(new Error('readiness endpoint unreachable'));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <MantineProvider>
+      <MantineProvider env="test">
         <QueryClientProvider client={client}>
           <MemoryRouter>
             <ReadinessPage />

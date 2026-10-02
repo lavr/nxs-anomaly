@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Kbd, Group, Modal, Stack, Text, TextInput, UnstyledButton } from '@mantine/core';
 import { useHotkeys } from '@mantine/hooks';
 import { IconSearch } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useI18n } from '../i18n/I18nProvider';
 import type { StringKey } from '../i18n/I18nProvider';
 

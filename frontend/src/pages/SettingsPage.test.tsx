@@ -2,7 +2,7 @@ import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage, mobilePairingUri } from './SettingsPage';
 
@@ -97,7 +97,7 @@ function renderPage(
   put.mockResolvedValue(channels[0] ?? {});
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter>
           <SettingsPage />
@@ -232,7 +232,7 @@ describe('SettingsPage ChatOps tab', () => {
     get.mockRejectedValue(new Error('chatops channels unavailable'));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <MantineProvider>
+      <MantineProvider env="test">
         <QueryClientProvider client={client}>
           <MemoryRouter>
             <SettingsPage />

@@ -22,7 +22,7 @@ import type { MantineColor } from '@mantine/core';
 function useCountUp(value: number | string | undefined): number | string | undefined {
   const reduce = useReducedMotion();
   const [shown, setShown] = useState(value);
-  const frame = useRef<number>();
+  const frame = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (typeof value !== 'number' || reduce) {

@@ -260,7 +260,12 @@ func (e *Engine) ProcessNotificationDeliveries(ctx context.Context) ([]map[strin
 				ntfID := model.WrapNotification(r.ntf).ID()
 				cur := notificationMap(state.Notifications[ntfID])
 				if cur == nil {
-					cur = r.ntf
+					// The row went while it was out for delivery: its person or
+					// group was deleted and the foreign key cascaded. Writing the
+					// claimed copy back would re-insert it, fail that same key and
+					// roll back the save for the whole batch — every other page
+					// in it stuck 'delivering' until the reaper, then sent again.
+					continue
 				}
 				n := model.WrapNotification(cur)
 				if !n.IsDelivering() {
@@ -531,7 +536,8 @@ func (e *Engine) ProcessNotificationRetries(ctx context.Context) ([]map[string]a
 				ntfID := model.WrapNotification(r.ntf).ID()
 				cur := notificationMap(state.Notifications[ntfID])
 				if cur == nil {
-					cur = r.ntf
+					// Deleted mid-retry; see ProcessNotificationDeliveries.
+					continue
 				}
 				n := model.WrapNotification(cur)
 				if !n.IsRetrying() {

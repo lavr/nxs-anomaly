@@ -11,7 +11,7 @@ import {
   Title,
 } from '@mantine/core';
 import { IconArrowRight, IconUserCheck } from '@tabler/icons-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAllOf, useList, useOnCall } from '../api/hooks';
 import {
   Labels,

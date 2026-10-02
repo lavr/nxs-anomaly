@@ -15,7 +15,7 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { IconCheck, IconCopy, IconPlus, IconSettings } from '@tabler/icons-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAllOf, useCreate, useDelete, useFullList } from '../api/hooks';
 import { INTEGRATION_TYPES, type Integration } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';

@@ -22,7 +22,7 @@ vi.mock('./AuthProvider', () => ({
 
 function renderScreen() {
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <SignInScreen />
     </MantineProvider>,
   );

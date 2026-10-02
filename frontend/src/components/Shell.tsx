@@ -40,7 +40,7 @@ import {
   IconCalendarTime,
   IconTool,
 } from '@tabler/icons-react';
-import { NavLink as RouterNavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink as RouterNavLink, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { useCapabilities, useHealth } from '../api/hooks';
 import { useI18n } from '../i18n/I18nProvider';

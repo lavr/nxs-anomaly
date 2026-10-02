@@ -2,7 +2,7 @@ import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MaintenancePage } from './MaintenancePage';
 
@@ -64,7 +64,7 @@ function renderPage(items: ReturnType<typeof windowAt>[]) {
   post.mockResolvedValue(windowAt('new', 0, 1));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter>
           <MaintenancePage />
@@ -136,7 +136,7 @@ describe('MaintenancePage', () => {
     await user.type(await screen.findByLabelText('Name'), 'Database failover');
     await user.type(screen.getByLabelText('From'), '2026-09-01T01:00');
     await user.type(screen.getByLabelText('Until'), '2026-09-01T03:00');
-    await user.click(screen.getByRole('textbox', { name: 'Integrations' }));
+    await user.click(screen.getByRole('combobox', { name: 'Integrations' }));
     await user.click(await screen.findByText('prod exporter'));
 
     const buttons = screen.getAllByRole('button', { name: /plan window/i });

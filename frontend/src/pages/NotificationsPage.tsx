@@ -14,7 +14,7 @@ import {
   Text,
 } from '@mantine/core';
 import { IconPlayerPlay } from '@tabler/icons-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAllOf, useDeliveryAttempts, useList, useRunEscalations } from '../api/hooks';
 import { NOTIFICATION_TARGET_TYPES, type Notification } from '../api/types';
 import {

@@ -1,7 +1,7 @@
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationsPage } from './NotificationsPage';
 
@@ -57,7 +57,7 @@ function renderPage(items: ReturnType<typeof notification>[], entries: string[] 
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider>
+    <MantineProvider env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={entries}>
           <NotificationsPage />
@@ -167,7 +167,7 @@ describe('NotificationsPage', () => {
     get.mockRejectedValue(new Error('notifications unavailable'));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <MantineProvider>
+      <MantineProvider env="test">
         <QueryClientProvider client={client}>
           <MemoryRouter>
             <NotificationsPage />

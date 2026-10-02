@@ -28,7 +28,7 @@ import {
   IconTrash,
   IconUserCheck,
 } from '@tabler/icons-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import {
   useAllOf,
   useCreateOverride,

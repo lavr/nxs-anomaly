@@ -25,31 +25,31 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
-    "@mantine/core": "^7.17.0",
-    "@mantine/dates": "^7.17.0",
-    "@mantine/hooks": "^7.17.0",
-    "@mantine/notifications": "^7.17.0",
-    "@tabler/icons-react": "^3.30.0",
-    "@tanstack/react-query": "^5.66.0",
-    "dayjs": "^1.11.13",
+    "@mantine/core": "^9.6.3",
+    "@mantine/dates": "^9.6.3",
+    "@mantine/hooks": "^9.6.3",
+    "@mantine/notifications": "^9.6.3",
+    "@tabler/icons-react": "^3.48.0",
+    "@tanstack/react-query": "^5.104.1",
+    "dayjs": "^1.11.23",
     "qrcode-generator": "^2.0.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.4"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^8.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "~1.61.1",
-    "@testing-library/jest-dom": "^7.0.0",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^6.0.4",
-    "@vitest/coverage-v8": "^4.1.11",
-    "jsdom": "^25.0.1",
+    "@playwright/test": "~1.63.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
-    "typescript": "^5.7.3",
-    "vite": "^8.1.5",
-    "vitest": "^4.1.11"
+    "typescript": "^5.9.3",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
   }
 }
