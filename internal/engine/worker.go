@@ -147,23 +147,27 @@ func (e *Engine) RunWorkerCycle(ctx context.Context) (map[string]any, error) {
 	stage("policy_runs", s)
 
 	s = time.Now()
-	purged := e.RetentionSweep(ctx)
-	archived := purged[RetentionAlertGroups]
-	archivedChatops := purged[RetentionChatopsMessages]
-	// Expired and revoked sessions stop authenticating the moment they lapse
-	// (the lookup filters on both); this only stops the table growing without
-	// bound. The row is kept for a day after the fact so a session that was
-	// live during an incident is still there to look at. Independent of the
-	// web_sessions retention horizon, which bounds sessions that never expired.
-	if _, err := e.store.DeleteExpiredWebSessions(ctx); err != nil {
-		slog.Warn("clean_expired_web_sessions_failed", "error", err)
-	}
-	// Sign-in rate buckets. A bucket untouched for an hour has long since
-	// refilled — the sign-in limiter's slowest bucket refills in under a minute —
-	// so it grants exactly what a missing row grants, and keeping it only grows
-	// the table by one row per client IP that ever tried to sign in.
-	if _, err := e.store.PruneRateBuckets(ctx, utils.ToISO(utils.UTCNow().Add(-time.Hour))); err != nil {
-		slog.Warn("prune_rate_buckets_failed", "error", err)
+	var archived, archivedChatops int
+	if time.Since(e.lastRetentionSweep) >= retentionSweepInterval {
+		e.lastRetentionSweep = time.Now()
+		purged := e.RetentionSweep(ctx)
+		archived = purged[RetentionAlertGroups]
+		archivedChatops = purged[RetentionChatopsMessages]
+		// Expired and revoked sessions stop authenticating the moment they lapse
+		// (the lookup filters on both); this only stops the table growing without
+		// bound. The row is kept for a day after the fact so a session that was
+		// live during an incident is still there to look at. Independent of the
+		// web_sessions retention horizon, which bounds sessions that never expired.
+		if _, err := e.store.DeleteExpiredWebSessions(ctx); err != nil {
+			slog.Warn("clean_expired_web_sessions_failed", "error", err)
+		}
+		// Sign-in rate buckets. A bucket untouched for an hour has long since
+		// refilled — the sign-in limiter's slowest bucket refills in under a minute —
+		// so it grants exactly what a missing row grants, and keeping it only grows
+		// the table by one row per client IP that ever tried to sign in.
+		if _, err := e.store.PruneRateBuckets(ctx, utils.ToISO(utils.UTCNow().Add(-time.Hour))); err != nil {
+			slog.Warn("prune_rate_buckets_failed", "error", err)
+		}
 	}
 	stage("archival", s)
 

@@ -439,10 +439,17 @@ func (s *pgStore) QueryHistoryGroups(ctx context.Context, filters map[string]any
 
 // DeleteOldChatopsMessages removes chatops messages older than cutoffISO.
 // created_at is read from the JSONB data field (no typed column required).
+//
+// The comparison is text against text on purpose: it is the expression of
+// nxs_anomaly_chatops_messages_created_at_idx (migration 0015), so the index
+// serves it. Casting to timestamptz cannot be indexed (the cast depends on the
+// session time zone) and turned every sweep into a scan of the whole table.
+// Text order is time order because every writer stores utils.ToISO — fixed
+// width, UTC, "+00:00" — and cutoffISO comes from the same function.
 func (s *pgStore) DeleteOldChatopsMessages(ctx context.Context, cutoffISO string) (int, error) {
 	tag, err := s.pool.Exec(ctx,
 		`DELETE FROM nxs_anomaly_chatops_messages
-		 WHERE (data->>'created_at')::timestamptz < $1::timestamptz`,
+		 WHERE data->>'created_at' < $1`,
 		cutoffISO)
 	if err != nil {
 		return 0, err

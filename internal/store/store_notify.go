@@ -43,6 +43,7 @@ func (s *pgStore) WaitForWake(ctx context.Context, timeout time.Duration) bool {
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if _, err := s.listenConn.Conn().WaitForNotification(waitCtx); err == nil {
+		s.drainWakesLocked(ctx)
 		return true
 	}
 	if waitCtx.Err() != nil && ctx.Err() == nil {
@@ -53,6 +54,37 @@ func (s *pgStore) WaitForWake(ctx context.Context, timeout time.Duration) bool {
 	// discards it (it has LISTEN state) and re-establish on the next call.
 	s.dropListenerLocked()
 	return false
+}
+
+// wakeDrainWindow is how long drainWakesLocked waits for one more queued wake,
+// and wakeDrainBudget bounds the whole drain so a steady stream of ingests
+// cannot keep the worker from starting its cycle.
+const (
+	wakeDrainWindow = 5 * time.Millisecond
+	wakeDrainBudget = 100 * time.Millisecond
+)
+
+// drainWakesLocked consumes the wakes that queued up behind the one that woke
+// us. Every ingest sends its own NOTIFY and PostgreSQL does not merge them
+// across transactions, so without this a storm of N alerts leaves N wakes in
+// the connection buffer and the worker runs N full cycles, one per wake, long
+// after the storm is over. One cycle handles all the work they announce.
+// A timeout only sets a read deadline (pgconn's default context handler), so
+// the listener connection stays usable. Caller must hold listenMu.
+func (s *pgStore) drainWakesLocked(ctx context.Context) {
+	deadline := time.Now().Add(wakeDrainBudget)
+	for time.Now().Before(deadline) {
+		drainCtx, cancel := context.WithTimeout(ctx, wakeDrainWindow)
+		_, err := s.listenConn.Conn().WaitForNotification(drainCtx)
+		cancel()
+		if err != nil {
+			if ctx.Err() == nil && drainCtx.Err() == nil {
+				// Not a timeout: the connection is broken; reconnect next call.
+				s.dropListenerLocked()
+			}
+			return
+		}
+	}
 }
 
 // dropListenerLocked closes and releases the listener connection.

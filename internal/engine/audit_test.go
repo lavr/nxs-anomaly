@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nixys/nxs-anomaly/internal/authz"
 	"github.com/nixys/nxs-anomaly/internal/store"
@@ -200,6 +201,17 @@ func TestAuditRetentionPrunesOnlyOldEvents(t *testing.T) {
 	}
 
 	eng.deliveryCfg.Retention.AuditDays = 30
+	// The archival stage ran a moment ago, so the next cycle skips it: during a
+	// storm the worker cycles once per wake, and a sweep per cycle was the
+	// database time ingest lacked.
+	if _, err := eng.RunWorkerCycle(ctx); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if n := len(st.AuditEvents()); n != 3 {
+		t.Fatalf("a cycle within retentionSweepInterval swept: %d events left, want 3", n)
+	}
+
+	eng.lastRetentionSweep = time.Time{}
 	if _, err := eng.RunWorkerCycle(ctx); err != nil {
 		t.Fatalf("cycle: %v", err)
 	}

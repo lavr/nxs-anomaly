@@ -534,7 +534,7 @@ value.
 
 ### 6.3. By horizon — retention
 
-The sweep runs every worker cycle, per category, independently. `0` means keep
+The sweep runs at most once a minute, per category, independently. `0` means keep
 forever, and that is also the default for new categories, because upgrading a
 version must not start deleting data nobody asked to delete.
 

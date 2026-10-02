@@ -150,7 +150,7 @@ run it only when you mean to discard whatever is already there.
 | `NXS_ANOMALY_WORKER_ADDR` | `:8081` | where `run-worker` serves `/live`, `/ready` and `/metrics` |
 | `NXS_ANOMALY_TLS_CERT` / `_KEY` | — | serve HTTPS directly; usually TLS ends at the ingress instead |
 | `NXS_ANOMALY_START_SCHEDULER` | `true` | `false` — `serve` runs no worker cycle; run `run-worker` separately |
-| `NXS_ANOMALY_POLL_INTERVAL` | `5` | seconds between worker cycles when nothing wakes it; an ingest wakes the worker at once through PostgreSQL `LISTEN/NOTIFY` |
+| `NXS_ANOMALY_POLL_INTERVAL` | `5` | seconds between worker cycles when nothing wakes it; an ingest wakes the worker at once through PostgreSQL `LISTEN/NOTIFY`; wake-started cycles are at least 200 ms apart, so a storm is handled in batches |
 | `NXS_ANOMALY_WORKER_CYCLE_TIMEOUT_SECONDS` | — (off) | a deadline for one worker cycle; unset or `0` means none — a large delivery backlog can legitimately take long |
 | `NXS_ANOMALY_SHUTDOWN_TIMEOUT` | `10` | seconds to finish requests in flight on SIGTERM |
 | `NXS_ANOMALY_HTTP_READ_HEADER_TIMEOUT_SECONDS` | `5` | time to read request headers (slowloris protection) |
