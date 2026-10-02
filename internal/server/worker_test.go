@@ -103,3 +103,25 @@ func scrapeMetrics(t *testing.T, m *Metrics) string {
 	}
 	return rec.Body.String()
 }
+
+// TestWakeSpacingDelay pins the storm rule: wake-started cycles are at least
+// minWakeSpacing apart, a wake after a quiet spell and a poll tick are not held.
+func TestWakeSpacingDelay(t *testing.T) {
+	cases := []struct {
+		name  string
+		woke  bool
+		since time.Duration
+		want  time.Duration
+	}{
+		{"wake right after a cycle started", true, 50 * time.Millisecond, 150 * time.Millisecond},
+		{"wake just at the spacing", true, minWakeSpacing, 0},
+		{"wake after a quiet spell", true, 5 * time.Second, 0},
+		{"first wake ever", true, time.Since(time.Time{}), 0},
+		{"poll tick", false, 10 * time.Millisecond, 0},
+	}
+	for _, c := range cases {
+		if got := wakeSpacingDelay(c.woke, c.since); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}

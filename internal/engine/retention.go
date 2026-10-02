@@ -10,8 +10,9 @@ import (
 // RetentionSweep deletes whatever has outlived its configured horizon and
 // returns how many rows went, by category.
 //
-// It runs every worker cycle. Each category is independent: a failure in one is
-// logged and the rest still run, because a retention sweep that stops at the
+// The worker runs it at most once a minute (retentionSweepInterval). Each
+// category is independent: a failure in one is logged and the rest still run,
+// because a retention sweep that stops at the
 // first error is a sweep that silently stops running the day one table develops
 // a problem — and the categories it never reached are the ones nobody notices.
 //

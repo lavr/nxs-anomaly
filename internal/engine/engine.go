@@ -151,6 +151,9 @@ type Engine struct {
 	// lastDutyGap is the check-in gap last written to the log, as
 	// [missing, on_call]. Same ownership as lastCoverageCheck.
 	lastDutyGap [2]int
+	// lastRetentionSweep throttles the archival stage (retention sweep and the
+	// session and rate-bucket pruning). Same ownership as lastCoverageCheck.
+	lastRetentionSweep time.Time
 	// reopenAckedOnNewAlert is the deployment's policy for an alert arriving on
 	// an acknowledged group. Off by default: an acknowledgement means an
 	// operator answered, and a source that keeps re-sending the same alert must
@@ -175,6 +178,12 @@ type Engine struct {
 // when someone edits a schedule, so running it per worker cycle would be
 // several hundred pointless reads an hour.
 const coverageCheckInterval = time.Minute
+
+// retentionSweepInterval is how often the worker runs the archival stage.
+// Retention horizons are whole days, and the stage scans tables, so running it
+// on every cycle — a cycle per wake during a storm — only takes database time
+// from ingest without deleting anything sooner in any way that matters.
+const retentionSweepInterval = time.Minute
 
 // OutboxMessage is one outbox event on its way to the bus. It carries its own
 // topic because a single batch mixes topics: an integration may override the

@@ -1408,6 +1408,40 @@ func TestNotifyWakeWakesWaiter(t *testing.T) {
 	}
 }
 
+// TestQueuedWakesCoalesce pins the storm behaviour: every ingest sends its own
+// NOTIFY and PostgreSQL does not merge them across transactions, so the waiter
+// finds them all queued. One WaitForWake must consume the queue — otherwise the
+// worker runs one full cycle per queued wake, which on the QA stand after a
+// storm of 86 400 alerts meant 48 minutes of back-to-back cycles.
+func TestQueuedWakesCoalesce(t *testing.T) {
+	ctx := context.Background()
+	st, _ := newIntegrationEngine(t, ctx)
+	defer st.Close()
+
+	// First call establishes the LISTEN connection (returns false on timeout).
+	st.WaitForWake(ctx, 50*time.Millisecond)
+
+	const queued = 500
+	for i := 0; i < queued; i++ {
+		if err := st.NotifyWake(ctx); err != nil {
+			t.Fatalf("notify wake %d: %v", i, err)
+		}
+	}
+
+	// Count wakes until the waiter goes quiet. A notification still in flight
+	// when the first drain stopped may cost one more; the queue must not.
+	wakes := 0
+	for wakes <= queued && st.WaitForWake(ctx, testDeadline(time.Second)) {
+		wakes++
+	}
+	if wakes == 0 {
+		t.Fatal("WaitForWake was not woken by the queued notifications")
+	}
+	if wakes > 2 {
+		t.Fatalf("%d queued wakes took %d WaitForWake returns, want at most 2", queued, wakes)
+	}
+}
+
 // TestDeadLetterFiredOnBatchContextLoss verifies that a batched notification
 // whose delivery context cannot be rebuilt at flush time (no stored payload,
 // no user — the escalation-webhook shape) is marked failed by

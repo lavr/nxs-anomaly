@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.11] — 2026-10-01
+
+### Fixed
+- **The worker no longer runs one cycle per accepted alert after a storm.**
+  Every ingest wakes the worker with its own NOTIFY, and PostgreSQL does not
+  merge them, so after a storm of N alerts the worker ran N full cycles, one
+  per queued wake: on a test stand, 48 minutes of back-to-back cycles after
+  86 400 alerts, with the database busy the whole time and ingest slower during
+  the storm itself. A wake now consumes the wakes queued behind it, and
+  wake-started cycles are at least 200 ms apart: a single alert is still
+  handled at once, a storm in batches.
+- **The retention sweep runs at most once a minute**, not on every worker
+  cycle. Horizons are whole days; the sweep's table scans only took database
+  time from ingest.
+- **The ChatOps message sweep uses its index.** It compared a timestamptz cast
+  that the index (migration 0015) cannot serve, so every sweep read the whole
+  table.
+
 ## [1.9.10] — 2026-09-30
 
 ### Changed

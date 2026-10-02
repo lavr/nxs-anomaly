@@ -168,14 +168,42 @@ func RunWorker(ctx context.Context, s store.PostgreSQLStore, eng *engine.Engine,
 
 func (wr *workerRuntime) loop(ctx context.Context) {
 	slog.Info("worker started", "poll_interval", wr.cfg.PollInterval, "telemetry_addr", wr.cfg.WorkerAddr)
+	var lastStart time.Time
 	for {
-		wr.store.WaitForWake(ctx, wr.cfg.PollInterval)
+		woke := wr.store.WaitForWake(ctx, wr.cfg.PollInterval)
+		if d := wakeSpacingDelay(woke, time.Since(lastStart)); d > 0 {
+			t := time.NewTimer(d)
+			select {
+			case <-ctx.Done():
+			case <-t.C:
+			}
+			t.Stop()
+		}
 		if ctx.Err() != nil {
 			slog.Info("worker stopped")
 			return
 		}
+		lastStart = time.Now()
 		wr.heartbeat.cycleCompleted(runWorkerCycleOnce(ctx, wr.eng, wr.store, wr.metrics))
 	}
+}
+
+// minWakeSpacing is the shortest gap between the starts of two cycles when the
+// second one was started by a wake rather than the poll interval.
+const minWakeSpacing = 200 * time.Millisecond
+
+// wakeSpacingDelay says how long to hold a wake-started cycle back. During an
+// alert storm every ingest wakes the worker, a new wake arrives while each
+// cycle runs, and the cycles would follow one another with no gap — taking the
+// database from the ingest that caused them. A wake after a quiet spell runs at
+// once, so a single alert is delivered as fast as before; under a storm a page
+// waits at most minWakeSpacing longer, and the wakes that arrive meanwhile are
+// all handled by the next cycle.
+func wakeSpacingDelay(woke bool, sinceLastStart time.Duration) time.Duration {
+	if !woke || sinceLastStart >= minWakeSpacing {
+		return 0
+	}
+	return minWakeSpacing - sinceLastStart
 }
 
 // handleLive is the liveness probe: 200 as long as the process serves HTTP. It
