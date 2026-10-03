@@ -377,11 +377,13 @@ func (g AlertGroup) AddNotifiedUser(userID string) {
 // ChatChannelRef is a ChatOps channel a group was posted to, with the
 // notification channel and target the post went out on: "chatops" and the
 // channel id for a webhook-backed channel, "telegram" and the chat id for a
-// Telegram one.
+// Telegram one. NotificationID is the latest alert message posted there — the
+// one a status change edits, when the channel can edit messages.
 type ChatChannelRef struct {
-	ID      string
-	Channel string
-	Target  string
+	ID             string
+	Channel        string
+	Target         string
+	NotificationID string
 }
 
 // NotifiedChatChannels are the ChatOps channels this group was posted to, in
@@ -401,9 +403,10 @@ func (g AlertGroup) NotifiedChatChannels() []ChatChannelRef {
 			continue
 		}
 		ref := ChatChannelRef{
-			ID:      utils.StrVal(m, "id"),
-			Channel: utils.StrVal(m, "channel"),
-			Target:  utils.StrVal(m, "target"),
+			ID:             utils.StrVal(m, "id"),
+			Channel:        utils.StrVal(m, "channel"),
+			Target:         utils.StrVal(m, "target"),
+			NotificationID: utils.StrVal(m, "notification_id"),
 		}
 		if ref.ID != "" && ref.Channel != "" {
 			out = append(out, ref)
@@ -412,23 +415,30 @@ func (g AlertGroup) NotifiedChatChannels() []ChatChannelRef {
 	return out
 }
 
-// AddNotifiedChatChannel records that the group was posted to a channel,
-// ignoring repeats so a re-escalation does not grow the list.
+// AddNotifiedChatChannel records that the group was posted to a channel. A
+// repeat does not grow the list; it moves the channel's notification_id to the
+// newer message, which is the one people in the channel are looking at.
 func (g AlertGroup) AddNotifiedChatChannel(ref ChatChannelRef) {
 	if ref.ID == "" || ref.Channel == "" {
 		return
 	}
+	entry := map[string]any{"id": ref.ID, "channel": ref.Channel, "target": ref.Target}
+	if ref.NotificationID != "" {
+		entry["notification_id"] = ref.NotificationID
+	}
 	existing, _ := g.d.Extra["notified_chatops_channels"].([]any)
+	next := make([]any, 0, len(existing)+1)
+	replaced := false
 	for _, item := range existing {
 		if m, ok := item.(map[string]any); ok && utils.StrVal(m, "id") == ref.ID {
-			return
+			item, replaced = entry, true
 		}
+		next = append(next, item)
 	}
-	next := make([]any, 0, len(existing)+1)
-	next = append(next, existing...)
-	g.d.Extra["notified_chatops_channels"] = append(next, map[string]any{
-		"id": ref.ID, "channel": ref.Channel, "target": ref.Target,
-	})
+	if !replaced {
+		next = append(next, entry)
+	}
+	g.d.Extra["notified_chatops_channels"] = next
 }
 
 // ChatopsStatusSeq counts the status changes the group's ChatOps channels
