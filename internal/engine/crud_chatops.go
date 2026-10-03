@@ -905,8 +905,12 @@ func (e *Engine) executeChatopsCommand(ctx context.Context, state *store.State, 
 			return nil, err
 		}
 		ts := utils.ToISO(utils.UTCNow())
+		firstAck := !g.IsAcknowledged()
 		if err := g.Acknowledge(ts, "Alert group acknowledged from ChatOps by "+chatHandle, principal); err != nil {
 			return nil, errValidation(err.Error())
+		}
+		if firstAck {
+			e.notifyChatopsStatus(state, g, chatopsEventAcknowledged, principal, ts)
 		}
 		return map[string]any{
 			"text":        "Acknowledged " + groupLabel(g) + " — " + principal.Describe(),
@@ -925,8 +929,12 @@ func (e *Engine) executeChatopsCommand(ctx context.Context, state *store.State, 
 			return nil, err
 		}
 		ts := utils.ToISO(utils.UTCNow())
+		firstResolve := !g.IsResolved()
 		g.Resolve(ts, "Resolved from ChatOps by "+chatHandle, principal)
 		e.notifyGroupResolved(state, g, ts)
+		if firstResolve {
+			e.notifyChatopsStatus(state, g, chatopsEventResolved, principal, ts)
+		}
 		return map[string]any{
 			"text":        "Resolved " + groupLabel(g) + " — " + principal.Describe(),
 			"alert_group": g.Raw(),
@@ -1011,9 +1019,11 @@ func (e *Engine) executeChatopsCommand(ctx context.Context, state *store.State, 
 		if err := guardChatopsGroupCommand(state, channel, principal, g); err != nil {
 			return nil, err
 		}
-		if err := g.Unacknowledge(utils.ToISO(utils.UTCNow()), principal); err != nil {
+		ts := utils.ToISO(utils.UTCNow())
+		if err := g.Unacknowledge(ts, principal); err != nil {
 			return nil, errValidation(err.Error())
 		}
+		e.notifyChatopsStatus(state, g, chatopsEventUnacknowledged, principal, ts)
 		return map[string]any{
 			"text":        "Acknowledgement taken back, escalation resumes: " + groupLabel(g),
 			"alert_group": g.Raw(),
@@ -1181,7 +1191,11 @@ func (e *Engine) chatopsBulk(state *store.State, channel map[string]any, princip
 		var err error
 		switch verb {
 		case "ack":
+			firstAck := !g.IsAcknowledged()
 			err = g.Acknowledge(ts, "Alert group acknowledged from ChatOps by "+chatHandle, principal)
+			if err == nil && firstAck {
+				e.notifyChatopsStatus(state, g, chatopsEventAcknowledged, principal, ts)
+			}
 		case "silence":
 			err = g.Silence(ts, until, "Alert group silenced from ChatOps by "+chatHandle, minutes, principal)
 		case "resolve":
@@ -1200,6 +1214,7 @@ func (e *Engine) chatopsBulk(state *store.State, channel map[string]any, princip
 	// actually written.
 	for _, g := range resolved {
 		e.notifyGroupResolved(state, g, ts)
+		e.notifyChatopsStatus(state, g, chatopsEventResolved, principal, ts)
 	}
 	what := verb
 	if verb == "silence" {

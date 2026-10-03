@@ -64,6 +64,13 @@ type DeliveryConfig struct {
 	// default: it is a new class of message, and doubling what a responder
 	// receives at night is not something an upgrade should decide for them.
 	NotifyOnResolve bool
+	// ChatopsStatusUpdates tells the ChatOps channels a group was posted to
+	// when it is acknowledged, unacknowledged or resolved. On by default,
+	// unlike NotifyOnResolve: it adds nothing to anybody's phone at night —
+	// it is one line in a room that already shows the alert, and without it
+	// the room cannot tell a handled alert from an unseen one.
+	// NXS_ANOMALY_CHATOPS_STATUS_UPDATES=false turns it off.
+	ChatopsStatusUpdates bool
 	// PublicURL is where this deployment answers from the outside. Mattermost
 	// buttons post back to an absolute URL, so without it they cannot be
 	// rendered — a button pointing nowhere is worse than none.
@@ -302,6 +309,7 @@ func DeliveryConfigFromEnv() DeliveryConfig {
 		WorkerCycleTimeout:      cycleTimeout,
 		HTTPClient:              newDeliveryHTTPClientWithPolicy(timeout, blockedIPPolicy(blockPrivate, exempt), channels),
 		NotifyOnResolve:         os.Getenv("NXS_ANOMALY_NOTIFY_ON_RESOLVE") == "true",
+		ChatopsStatusUpdates:    os.Getenv("NXS_ANOMALY_CHATOPS_STATUS_UPDATES") != "false",
 		PublicURL:               strings.TrimSpace(os.Getenv("NXS_ANOMALY_PUBLIC_URL")),
 		MattermostActionSecret:  strings.TrimSpace(os.Getenv("NXS_ANOMALY_MATTERMOST_ACTION_SECRET")),
 		DeadLetterWebhookURL:    os.Getenv("NXS_ANOMALY_DEAD_LETTER_WEBHOOK_URL"),

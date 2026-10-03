@@ -80,6 +80,9 @@ func (e *Engine) deliverNotificationViaAdapter(ctx context.Context, ntf map[stri
 			"reason", outcome.ProviderStatus, "detail", outcome.Err)
 		return outcome
 	}
+	if outcome, gone := e.chatopsStatusChannelGone(ctx, payload); gone {
+		return outcome
+	}
 
 	switch channel {
 	case "webhook":
@@ -114,8 +117,15 @@ func (e *Engine) deliverNotificationViaAdapter(ctx context.Context, ntf map[stri
 			keys = []string{"chatops", "telegram"}
 		}
 		text := renderNotificationText(ntf, payload, e.getNotificationTemplate(ctx, utils.StrVal(payload, "integration_id"), keys...))
+		// A status message ("acknowledged by …") carries no keyboard: the
+		// buttons belong under the alert, and a second set under the news that
+		// somebody already took it invites a second person to take it again.
+		groupID := utils.StrVal(payload, "alert_group_id")
+		if utils.StrVal(payload, "chatops_event") != "" {
+			groupID = ""
+		}
 		return e.sendTelegramOutcome(ctx, target, text,
-			utils.StrVal(payload, "alert_group_id"), telegramShiftOptions{
+			groupID, telegramShiftOptions{
 				offerCheckin: utils.BoolVal(payload, "offer_checkin", false),
 				scheduleID:   utils.StrVal(payload, "schedule_id"),
 			})

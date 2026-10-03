@@ -374,6 +374,63 @@ func (g AlertGroup) AddNotifiedUser(userID string) {
 	g.d.Extra["notified_user_ids"] = append(next, userID)
 }
 
+// ChatChannelRef is a ChatOps channel a group was posted to, with the
+// notification channel and target the post went out on: "chatops" and the
+// channel id for a webhook-backed channel, "telegram" and the chat id for a
+// Telegram one.
+type ChatChannelRef struct {
+	ID      string
+	Channel string
+	Target  string
+}
+
+// NotifiedChatChannels are the ChatOps channels this group was posted to, in
+// the order they first were.
+//
+// Kept on the group for the reason NotifiedUserIDs is: telling a channel that
+// the alert it showed was acknowledged or resolved must cost no extra load on
+// any path that changes a group's status, ingest included. Only channels that
+// had somewhere to send to are recorded — one without a transport never showed
+// the alert, so it has nothing to update.
+func (g AlertGroup) NotifiedChatChannels() []ChatChannelRef {
+	raw, _ := g.d.Extra["notified_chatops_channels"].([]any)
+	out := make([]ChatChannelRef, 0, len(raw))
+	for _, item := range raw {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		ref := ChatChannelRef{
+			ID:      utils.StrVal(m, "id"),
+			Channel: utils.StrVal(m, "channel"),
+			Target:  utils.StrVal(m, "target"),
+		}
+		if ref.ID != "" && ref.Channel != "" {
+			out = append(out, ref)
+		}
+	}
+	return out
+}
+
+// AddNotifiedChatChannel records that the group was posted to a channel,
+// ignoring repeats so a re-escalation does not grow the list.
+func (g AlertGroup) AddNotifiedChatChannel(ref ChatChannelRef) {
+	if ref.ID == "" || ref.Channel == "" {
+		return
+	}
+	existing, _ := g.d.Extra["notified_chatops_channels"].([]any)
+	for _, item := range existing {
+		if m, ok := item.(map[string]any); ok && utils.StrVal(m, "id") == ref.ID {
+			return
+		}
+	}
+	next := make([]any, 0, len(existing)+1)
+	next = append(next, existing...)
+	g.d.Extra["notified_chatops_channels"] = append(next, map[string]any{
+		"id": ref.ID, "channel": ref.Channel, "target": ref.Target,
+	})
+}
+
 // ResolveNotifiedAt is when the "this is over" notice went out, empty when it
 // has not. Resolve itself is idempotent and allowed from any state, so without
 // this a second resolve would page everyone again.
