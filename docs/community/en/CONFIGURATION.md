@@ -617,6 +617,20 @@ actually do:
   id, a Telegram chat id). Incoming slash commands arrive with that rather than the
   internal `id`, so without it commands from this channel will not match.
 
+**One message per step, and the status that follows.** A channel bound to a team
+belongs to every member, and a step that pages the team posts to the channel
+**once**, not once per member. When the group is then acknowledged, has its
+acknowledgement taken back, or is resolved — from the web UI, the API, a chat
+command or button, the source itself or a `RESOLVE` step — every channel the group
+was posted to gets a short status message (`[critical] Disk full` / `acknowledged
+by alice` / …). A channel the alert never reached (no `webhook_url`) is not told,
+and a channel deleted or with `notifications_enabled: false` by then is skipped at
+delivery. The message is an ordinary notification, delivered by the worker with
+the usual retries; templates see it with `{{ .event }}` set (see
+ALERT_PROCESSING.md §5.3). `NXS_ANOMALY_CHATOPS_STATUS_UPDATES=false` turns these
+messages off; they are independent of `NXS_ANOMALY_NOTIFY_ON_RESOLVE`, which tells
+*people* that an alert is over.
+
 For inbound commands (acknowledging an alert straight from the chat) configure a
 signature: `NXS_ANOMALY_SLACK_SIGNING_SECRET`,
 `NXS_ANOMALY_TELEGRAM_WEBHOOK_SECRET` or
