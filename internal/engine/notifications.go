@@ -253,6 +253,7 @@ func (e *Engine) fanoutChatopsNotifications(state *store.State, g model.AlertGro
 		} else {
 			// Only a channel that could show the alert has anything to update
 			// when its status changes.
+			ref.NotificationID = ntf.ID()
 			g.AddNotifiedChatChannel(ref)
 		}
 		recordChatopsOutbound(state, channelID, ntf.ID(), deliveryStatus, g, reason, timestamp)

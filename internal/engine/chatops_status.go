@@ -58,6 +58,12 @@ func (e *Engine) notifyChatopsStatus(state *store.State, g model.AlertGroup, eve
 		payload := notificationPayload(g, nil, reason)
 		payload["chatops_channel_id"] = ch.ID
 		payload["chatops_event"] = event
+		// The alert message this status belongs to. Its platform message id is
+		// only known once that message is delivered, so it is looked up at
+		// delivery rather than copied here.
+		if ch.NotificationID != "" {
+			payload["chatops_alert_notification_id"] = ch.NotificationID
+		}
 		ntf.ScheduleDelivery(payload)
 		addNotification(state, ntf, nil)
 		recordChatopsOutbound(state, ch.ID, ntf.ID(), "queued", g, reason, timestamp)

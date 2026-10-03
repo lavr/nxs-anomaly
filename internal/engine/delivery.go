@@ -370,6 +370,7 @@ func (e *Engine) applyOutcome(n model.Notification, res deliveryOutcome, ts stri
 	switch res.Status {
 	case deliveryDelivered:
 		n.MarkDelivered(ts, strDefault(res.ProviderStatus, "delivered"))
+		n.SetProviderMessageID(res.MessageID)
 	case deliverySkipped:
 		n.MarkSkipped(ts, strDefault(res.ProviderStatus, skipNotConfigured), res.Err)
 		e.sink().IncNotificationSkipped(n.Channel(), strDefault(res.ProviderStatus, skipNotConfigured))

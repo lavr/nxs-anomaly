@@ -330,10 +330,32 @@ func (e *Engine) deliverChatops(ctx context.Context, ntf map[string]any, channel
 			text += "\n" + url
 		}
 	}
+	update := chatopsMessageUpdateOf(channel)
+	isStatus := utils.StrVal(payload, "chatops_event") != ""
+	if update != nil && isStatus {
+		if res, done := e.updateChatopsMessage(ctx, ntf, channel, payload, update, text, headers); done {
+			return res
+		}
+	}
+	// The alert message's response is kept only when the channel edits
+	// messages: that is the one reader of the id in it.
+	var keepBody int64
+	if update != nil && !isStatus {
+		keepBody = maxMessageIDBody
+	}
 	proxyChannel := e.deliveryCfg.chatopsProxyChannel(platform)
-	res := postWebhookGuarded(ctx, e.deliveryCfg.clientFor(proxyChannel), webhookURL,
-		map[string]any{"text": text}, e.deliveryCfg.ssrfGuardFor(proxyChannel), headers)
-	res.ProviderStatus = utils.StrVal(channel, "platform") + "_chatops"
+	res, body := sendJSONGuarded(ctx, e.deliveryCfg.clientFor(proxyChannel), http.MethodPost, webhookURL,
+		map[string]any{"text": text}, e.deliveryCfg.ssrfGuardFor(proxyChannel), headers, keepBody)
+	res.ProviderStatus = platform + "_chatops"
+	if keepBody > 0 && res.Status == deliveryDelivered {
+		if res.MessageID = messageIDAt(body, update.MessageIDPath); res.MessageID == "" {
+			// Delivered all the same; only the later edit is lost, and its
+			// status message will be posted as a new one instead.
+			slog.Warn("chatops_message_id_not_found",
+				"channel_id", channelID, "message_id_path", update.MessageIDPath,
+				"effect", "status changes of this alert are posted as new messages")
+		}
+	}
 	return res
 }
 
