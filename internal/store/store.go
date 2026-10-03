@@ -536,6 +536,10 @@ type PostgreSQLStore interface {
 	// hidden integrations and returns one page of them, newest alert first
 	// (ties by id). A group with no integration is never hidden.
 	PageUnresolvedAlertGroups(ctx context.Context, hiddenIntegrations []string, limit, offset int) ([]map[string]any, int, error)
+	// IntegrationTeams maps every integration, soft-deleted ones included, to
+	// its team id ("" when unassigned). It reads two columns, so deciding which
+	// groups a chat may see does not decode every integration's whole payload.
+	IntegrationTeams(ctx context.Context) (map[string]string, error)
 	QueryHistoryGroups(ctx context.Context, filters map[string]any, limit, offset int) ([]map[string]any, int, error)
 	// InsightsSummaryQuery answers the whole insights screen at once — the
 	// counts it shows and the daily trend behind them.

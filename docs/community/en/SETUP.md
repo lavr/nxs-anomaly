@@ -184,6 +184,7 @@ Connection pool:
 | Variable | Default | |
 |---|---|---|
 | `NXS_ANOMALY_DB_POOL_MAX` | `10` | maximum connections |
+| `NXS_ANOMALY_API_READ_CONCURRENCY` | half of `NXS_ANOMALY_DB_POOL_MAX` | API reads (GET) running at once per process; the rest of the pool stays free for ingest, the worker and writes. A read that waits over 10 s gets 503 + `Retry-After` |
 | `NXS_ANOMALY_DB_POOL_MIN` | `1` | idle connections kept; `0` keeps none |
 | `NXS_ANOMALY_DB_POOL_MAX_CONN_LIFETIME_SECONDS` | `3600` | shed connections after a failover or through a load balancer |
 | `NXS_ANOMALY_DB_STATEMENT_TIMEOUT_SECONDS` | `30` | per-connection `statement_timeout`; migrations are exempt. `0` sends no `statement_timeout` at all — required behind PgBouncer, which rejects startup parameters it is not told to ignore |
@@ -271,8 +272,9 @@ one succeeds. Once `…_0_HOST` is set, the unnumbered variables are not read.
 ## Hardening
 
 `NXS_ANOMALY_PROFILE=production` turns on the safe defaults together: the SSRF
-guard, request rate limits, the delivery circuit breaker, and the refusal to
-store new inline secrets. Every one of them can still be set individually.
+guard, request rate limits and the refusal to store new inline secrets. Every
+one of them can still be set individually. The delivery circuit breaker is on
+in every profile.
 
 Two that are worth knowing by name:
 
@@ -294,8 +296,8 @@ Two that are worth knowing by name:
   network.
 - `NXS_ANOMALY_EGRESS_ALLOWLIST` — hostnames and CIDRs delivery may reach at all.
 - `NXS_ANOMALY_CIRCUIT_BREAKER_THRESHOLD` — consecutive failures on one channel and
-  target before delivery to it is short-circuited (`0`, the default, turns the
-  breaker off; `5` under the production profile), and
+  target before delivery to it is short-circuited (`5` by default in every
+  profile; `0` turns the breaker off), and
   `NXS_ANOMALY_CIRCUIT_BREAKER_COOLDOWN_SECONDS` (`30`) — how long it stays open
   before a trial call.
 - `NXS_ANOMALY_REOPEN_ACKED_ON_NEW_ALERT=true` — a new alert on an acknowledged

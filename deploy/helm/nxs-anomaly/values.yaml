@@ -140,7 +140,8 @@ config:
   LOG_FORMAT: "json"
   # Security profile. Empty = permissive (dev/kind, works with inlineSecret and
   # bundled databases). Set to "production" to enable the safe-by-default profile
-  # (SSRF guard, rate limits, circuit breaker, inline-secret ban). The production
+  # (SSRF guard, rate limits, inline-secret ban; the circuit breaker is on in
+  # every profile). The production
   # preset (values-production.yaml) sets this and the chart preflight then refuses
   # unsafe combinations (inline secrets, bundled DBs, weakened flags).
   NXS_ANOMALY_PROFILE: ""

@@ -141,6 +141,13 @@ func (srv *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		writeRateLimited(w, 1, "rate limit exceeded")
 		return
 	}
+	release, admitted := srv.readLimiter.admitRead(w, r)
+	if !admitted {
+		return
+	}
+	if release != nil {
+		defer release()
+	}
 	// Everything downstream — the engine's audit records and the attribution
 	// written into alert group timelines — reads the actor from the context.
 	// Which tool is acting, not who: it decides whether what this request

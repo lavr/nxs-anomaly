@@ -246,10 +246,11 @@ func DeliveryConfigFromEnv() DeliveryConfig {
 		slog.Warn("ssrf_exemptions_without_guard", "key", ssrfExemptionsEnv,
 			"detail", "NXS_ANOMALY_BLOCK_PRIVATE_WEBHOOKS is off, so every private destination is reachable anyway")
 	}
-	breakerThreshold := 0
-	if prod {
-		breakerThreshold = 5
-	}
+	// On in every profile. Off, a single unreachable target with a few hundred
+	// pending pages held the worker's delivery stage for minutes (5 s timeout,
+	// eight at a time, the stage waits for the whole batch) — measured at 7.5
+	// minutes during which nobody else was paged. 0 still turns it off.
+	breakerThreshold := 5
 	if v := os.Getenv("NXS_ANOMALY_CIRCUIT_BREAKER_THRESHOLD"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 			breakerThreshold = n

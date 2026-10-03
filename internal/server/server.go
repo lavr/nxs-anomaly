@@ -43,6 +43,9 @@ type Server struct {
 	store   store.PostgreSQLStore
 	metrics *Metrics
 	cfg     Config
+	// readLimiter holds API reads to part of the database pool; nil (tests)
+	// means unlimited. See read_limit.go.
+	readLimiter *readLimiter
 	// webhookLimiter and apiLimiter stay per-process on purpose: they sit on the
 	// hot path, where a database round-trip per request would cost more than the
 	// protection is worth. The configured rate is therefore per replica — the
@@ -101,6 +104,7 @@ func New(ctx context.Context, s store.PostgreSQLStore, eng *engine.Engine, cfg C
 		loginLimiter:        newDBRateLimiter(s, "login:", loginRatePerSecond, loginBurst),
 		loginAccountLimiter: newDBRateLimiter(s, "login-account:", loginAccountRatePerSecond, loginAccountBurst),
 		chatopsInbound:      chatopsInboundConfigFromEnv(),
+		readLimiter:         newReadLimiterFromEnv(),
 	}
 	// Wire engine-emitted metrics (delivery latency, dead-letters, breaker skips)
 	// into this server's Prometheus registry.

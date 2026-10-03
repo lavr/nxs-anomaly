@@ -338,6 +338,16 @@ func (m *memStore) ListItemsIn(_ context.Context, col, field string, values []an
 	}), nil
 }
 
+func (m *memStore) IntegrationTeams(_ context.Context) (map[string]string, error) {
+	out := map[string]string{}
+	for _, r := range m.where("integrations", func(map[string]any) bool { return true }) {
+		id, _ := r["id"].(string)
+		team, _ := r["team_id"].(string)
+		out[id] = team
+	}
+	return out, nil
+}
+
 func (m *memStore) PageUnresolvedAlertGroups(_ context.Context, hidden []string, limit, offset int) ([]map[string]any, int, error) {
 	hide := make(map[string]bool, len(hidden))
 	for _, id := range hidden {

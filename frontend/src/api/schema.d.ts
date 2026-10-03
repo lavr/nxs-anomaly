@@ -3231,6 +3231,8 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         } & {
             [key: string]: unknown;
         };
@@ -3239,6 +3241,8 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         } & {
             [key: string]: unknown;
         };
@@ -3248,6 +3252,8 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         /** @description One answerable question about the installation. `blocker` means alerts can be lost or nobody gets paged; `warning` is worth fixing but does not break the alert path. A check that could not run is reported as a blocker, never as a pass. */
         ReadinessCheck: {
@@ -3636,6 +3642,8 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         /** @description The required keys are the ones internal/model/alertgroup.go emits unconditionally for every group shape. The optional ones live in the model's Extra map: they are shape-dependent (a direct-paged group has no integration) or nullable state. */
         AlertGroup: {
@@ -3750,18 +3758,24 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         TeamPage: {
             items: components["schemas"]["Team"][];
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         SchedulePage: {
             items: components["schemas"]["Schedule"][];
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         /** @description Planned work on the named integrations. Alert groups those integrations open between starts_at and ends_at are recorded and silenced instead of paging anyone; `integration_ids` always names at least one integration, because an empty list would mean one typo silenced the whole deployment. */
         MaintenanceWindow: {
@@ -3782,36 +3796,48 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         EscalationChainPage: {
             items: components["schemas"]["EscalationChain"][];
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         IntegrationPage: {
             items: components["schemas"]["Integration"][];
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         AlertGroupPage: {
             items: components["schemas"]["AlertGroup"][];
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         AlertPage: {
             items: components["schemas"]["Alert"][];
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         NotificationPage: {
             items: components["schemas"]["Notification"][];
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         /** @description One feature and why it is or is not usable here. */
         Capability: {
@@ -3863,6 +3889,8 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
+            total_estimated?: boolean;
         };
         MobilePairing: {
             /** @description One-time code, XXXXX-XXXXX (Crockford base32). Case, spaces and dashes are ignored on redemption. */

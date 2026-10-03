@@ -121,6 +121,7 @@ export function AlertsPage() {
             onChange={(next) => patch({ sort: next.field, order: next.desc ? 'desc' : 'asc' })}
           />
           <Text size="sm" c="dimmed" ml="auto">
+            {alerts.data?.total_estimated ? '≈ ' : ''}
             {plural('alerts.total', total)}
           </Text>
         </Group>
