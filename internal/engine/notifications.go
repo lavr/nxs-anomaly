@@ -216,9 +216,18 @@ func (e *Engine) fanoutChatopsNotifications(state *store.State, g model.AlertGro
 		platform := utils.StrVal(ch, "platform")
 		channelName := utils.StrVal(ch, "name")
 
+		// Keyed on the channel and the step execution, not on the member: a
+		// step that pages a team reaches every member, the team's channel
+		// belongs to each of them, and it is still one room. With the member in
+		// the key the channel read the same alert once per person on the team.
+		// The history row below is skipped with it, for the same reason.
+		idemKey := fmt.Sprintf("%s:chatops:%s:%s", groupID, channelID, stepKey)
+		if _, dup := seen[idemKey]; dup {
+			continue
+		}
+
 		var notificationID string
 		if platform == "telegram" {
-			idemKey := fmt.Sprintf("%s:%s:telegram:%s:%s", groupID, userID, channelName, stepKey)
 			ntf := buildNotification(g, userID, "telegram", channelName, reason, timestamp, idemKey)
 			payload := notificationPayload(g, user, reason)
 			// Marks this as the team's channel rather than a person's chat, so
@@ -228,7 +237,6 @@ func (e *Engine) fanoutChatopsNotifications(state *store.State, g model.AlertGro
 			addNotification(state, ntf, seen)
 			notificationID = ntf.ID()
 		} else {
-			idemKey := fmt.Sprintf("%s:%s:chatops:%s:%s", groupID, userID, channelID, stepKey)
 			ntf := buildNotification(g, userID, "chatops", channelID, reason, timestamp, idemKey)
 			// Queued, not assumed: the channel is a real transport only if it
 			// has an incoming webhook, and the delivery step is what decides.

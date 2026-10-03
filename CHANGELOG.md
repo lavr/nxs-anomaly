@@ -6,6 +6,14 @@ semantic versioning once it reaches 1.0.
 
 ## Unreleased
 
+### Fixed
+- **A team's ChatOps channel hears about an escalation step once.** The
+  channel belongs to every member of its team, and its notification was keyed
+  on the member, so a step paging a team of five posted the same alert to the
+  team's channel five times (and wrote five history rows). It is now keyed on
+  the group, the channel and the step execution; a REPEAT or a restarted chain
+  still posts again.
+
 ### Added
 - **ChatOps channels read integration templates.** A channel posted to through
   its `webhook_url` takes `templates.chatops`, then the key named after its
