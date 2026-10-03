@@ -631,6 +631,18 @@ ALERT_PROCESSING.md §5.3). `NXS_ANOMALY_CHATOPS_STATUS_UPDATES=false` turns the
 messages off; they are independent of `NXS_ANOMALY_NOTIFY_ON_RESOLVE`, which tells
 *people* that an alert is over.
 
+**Buttons in a Slack or Mattermost channel.** A Telegram channel has always shown
+the alert with its buttons. A `slack` or `mattermost` channel does when it is
+created or updated with `"interactive": true`: the alert is posted with the same
+buttons a personal notification carries ([below](#the-buttons-under-an-alert)), and
+a tap comes back through the same interactive endpoint, which finds the channel by
+`external_id` — so set that, and the channel's `team_id` bounds what a tap may do.
+Mattermost renders the buttons only with `NXS_ANOMALY_PUBLIC_URL` and
+`NXS_ANOMALY_MATTERMOST_ACTION_SECRET` set; Slack needs its app's interactivity
+pointed at this service. It is off by default because a channel's `webhook_url`
+may be any gateway, and one that received plain text must not start receiving
+blocks on upgrade. Status messages never carry buttons.
+
 **Editing the alert instead of adding a line.** An incoming webhook cannot edit
 what it posted, so by default a status change is a new message under the alert. A
 channel posted to through a chat API (or a gateway in front of one) that returns
