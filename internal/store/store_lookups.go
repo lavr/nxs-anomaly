@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -291,8 +292,8 @@ func (s *pgStore) ListCollectionPage(ctx context.Context, collection string, fil
 		base += " WHERE " + where
 	}
 
-	var total int
-	if err := s.pool.QueryRow(ctx, "SELECT COUNT(*) "+base, args...).Scan(&total); err != nil {
+	total, err := s.countCapped(ctx, base, args)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -305,6 +306,40 @@ func (s *pgStore) ListCollectionPage(ctx context.Context, collection string, fil
 	}
 	items, err := scanRows(rows)
 	return items, total, err
+}
+
+// ListTotalCap is how far a listing counts exactly. Beyond it the total is the
+// planner's estimate (never below ListTotalCap+1), and the API says so with
+// total_estimated: a page header reading "≈ 1 163 000 alerts" costs a
+// millisecond, while counting them exactly took 1.5–2.9 s of database CPU on
+// every request — under forty readers the database was saturated and ingest
+// itself started losing alerts.
+const ListTotalCap = 10000
+
+// countCapped counts the rows of "FROM … WHERE …" exactly up to ListTotalCap,
+// and estimates past it.
+func (s *pgStore) countCapped(ctx context.Context, base string, args []any) (int, error) {
+	var n int
+	q := fmt.Sprintf("SELECT COUNT(*) FROM (SELECT 1 %s LIMIT %d) capped", base, ListTotalCap+1)
+	if err := s.pool.QueryRow(ctx, q, args...).Scan(&n); err != nil {
+		return 0, err
+	}
+	if n <= ListTotalCap {
+		return n, nil
+	}
+	var plan []byte
+	if err := s.pool.QueryRow(ctx, "EXPLAIN (FORMAT JSON) SELECT 1 "+base, args...).Scan(&plan); err != nil {
+		return ListTotalCap + 1, nil //nolint:nilerr // the exact part already succeeded; an estimate is best-effort
+	}
+	var out []struct {
+		Plan struct {
+			Rows float64 `json:"Plan Rows"`
+		} `json:"Plan"`
+	}
+	if json.Unmarshal(plan, &out) != nil || len(out) == 0 || out[0].Plan.Rows <= ListTotalCap {
+		return ListTotalCap + 1, nil
+	}
+	return int(out[0].Plan.Rows), nil
 }
 
 // ListItemsIn returns items from a collection where field is in values.
@@ -373,6 +408,26 @@ func (s *pgStore) ListUnresolvedAlertGroupsNotifying(ctx context.Context, userID
 		return nil, err
 	}
 	return scanRows(rows)
+}
+
+// IntegrationTeams: see the Store interface. Deleted integrations stay in:
+// their groups can still be open, and a team boundary must still hide them.
+func (s *pgStore) IntegrationTeams(ctx context.Context) (map[string]string, error) {
+	rows, err := s.pool.Query(ctx,
+		"SELECT id, COALESCE(team_id, data->>'team_id', '') FROM "+EntityTables["integrations"])
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, team string
+		if err := rows.Scan(&id, &team); err != nil {
+			return nil, err
+		}
+		out[id] = team
+	}
+	return out, rows.Err()
 }
 
 // PageUnresolvedAlertGroups: see the Store interface. Counting and ordering

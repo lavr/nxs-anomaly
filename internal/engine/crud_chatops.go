@@ -194,6 +194,19 @@ func (e *Engine) PostChatopsDirectCommand(ctx context.Context, payload map[strin
 	return e.postChatopsCommand(ctx, payload, true)
 }
 
+// chatopsCommandLock is the advisory lock a command runs under. status and
+// alerts only read and append their own message row, so they take none: under
+// the shared lock every chat in the installation queued behind every status.
+func chatopsCommandLock(cmdParts []string) int64 {
+	if len(cmdParts) > 0 {
+		switch strings.ToLower(strings.TrimPrefix(cmdParts[0], "/")) {
+		case "status", "alerts":
+			return 0
+		}
+	}
+	return advisoryLock["post_chatops_command"]
+}
+
 // postChatopsCommand is the shared body. With direct set, no channel is loaded
 // or required and the command runs against a channel-shaped stand-in that
 // carries no team; everything else — the loads, the guards, the audit trail —
@@ -254,8 +267,9 @@ func (e *Engine) postChatopsCommand(ctx context.Context, payload map[string]any,
 		// group's team is its integration's. The collection is small, and
 		// resolving the owner outside the lock would decide access from a
 		// snapshot the mutation no longer runs on.
+		// status and alerts read team ids through chatopsOpenGroups instead.
 		switch strings.ToLower(strings.TrimPrefix(cmdParts[0], "/")) {
-		case "status", "alerts", "ack", "resolve", "show", "silence",
+		case "ack", "resolve", "show", "silence",
 			"unack", "unacknowledge", "unresolve", "reopen", "bulk":
 			loads = append(loads, store.LoadSpec{Collection: "integrations"})
 		}
@@ -300,7 +314,7 @@ func (e *Engine) postChatopsCommand(ctx context.Context, payload map[string]any,
 			}
 			state.ChatopsMessages[msg["id"].(string)] = msg
 			return msg, nil
-		}, advisoryLock["post_chatops_command"])
+		}, chatopsCommandLock(cmdParts))
 	if err != nil {
 		return nil, err
 	}
@@ -688,13 +702,21 @@ func alertsPageReply(pageGroups []model.AlertGroup, total, page int) map[string]
 // chatopsOpenGroups counts the unresolved groups this chat may see and returns
 // one page of them, newest first, from the database. Visibility follows
 // chatopsGroupAccess, which is decided by a group's integration: the hidden
-// integrations are worked out here (the collection is small and loaded), and
-// the database leaves their groups out.
-func (e *Engine) chatopsOpenGroups(ctx context.Context, state *store.State, channel map[string]any, principal authz.Actor, limit, offset int) ([]model.AlertGroup, int, error) {
+// integrations are worked out here from their team ids alone, and the database
+// leaves their groups out.
+//
+// Team ids, not the integrations: "the collection is small" stopped being true
+// on a long-lived install — 3,773 rows, 122 of them live, 3.6 MB of payload
+// decoded under the command lock on every status, which held ChatOps to about
+// two commands a second for the whole system.
+func (e *Engine) chatopsOpenGroups(ctx context.Context, channel map[string]any, principal authz.Actor, limit, offset int) ([]model.AlertGroup, int, error) {
+	teams, err := e.store.IntegrationTeams(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
 	var hidden []string
 	channelTeam := utils.StrVal(channel, "team_id")
-	for id, integration := range state.Integrations {
-		teamID := utils.StrVal(integration, "team_id")
+	for id, teamID := range teams {
 		if !principal.MayAccessTeam(teamID) || (channelTeam != "" && teamID != "" && teamID != channelTeam) {
 			hidden = append(hidden, id)
 		}
@@ -755,7 +777,7 @@ func (e *Engine) executeChatopsCommand(ctx context.Context, state *store.State, 
 		}, nil
 
 	case "status", "/status":
-		listed, total, err := e.chatopsOpenGroups(ctx, state, channel, principal, statusListLimit, 0)
+		listed, total, err := e.chatopsOpenGroups(ctx, channel, principal, statusListLimit, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -776,12 +798,12 @@ func (e *Engine) executeChatopsCommand(ctx context.Context, state *store.State, 
 		// Newest first: the group that just woke someone is the one they came to
 		// act on. Ties break on id so paging is stable — without that a repeated
 		// tap on "next" can show the same group twice and skip another.
-		_, total, err := e.chatopsOpenGroups(ctx, state, channel, principal, 0, 0)
+		_, total, err := e.chatopsOpenGroups(ctx, channel, principal, 0, 0)
 		if err != nil {
 			return nil, err
 		}
 		page := clampAlertsPage(total, pageArg(args))
-		pageGroups, total, err := e.chatopsOpenGroups(ctx, state, channel, principal, alertsPageSize, (page-1)*alertsPageSize)
+		pageGroups, total, err := e.chatopsOpenGroups(ctx, channel, principal, alertsPageSize, (page-1)*alertsPageSize)
 		if err != nil {
 			return nil, err
 		}

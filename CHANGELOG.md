@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.16] — 2026-10-03
+
+### Fixed
+- **Listings no longer count the whole table on every request.** Every list
+  answered `total` with an exact `COUNT(*)`; on a 1.16-million-row alerts table
+  that was 1.5–2.9 s of database CPU per page, and forty people reading lists
+  saturated the database. Listings now count exactly up to 10 000 rows and give
+  the planner's estimate past that, marked `total_estimated: true`; the web UI
+  shows such totals as "≈".
+- **Alert, alert group and notification pages no longer sort the whole table.**
+  Their default order (time `DESC NULLS LAST`, then `id DESC`) had no matching
+  index, so each page sorted every row. Migration `0034_list_default_order_idx`
+  adds one per listing.
+- **Reads can no longer starve ingest.** API reads (GET) run at most half the
+  database pool at once per process (`NXS_ANOMALY_API_READ_CONCURRENCY`), so
+  ingest, the worker and writes always have connections; a read that waits over
+  10 s gets 503 + `Retry-After`. Before, forty readers took the whole pool and
+  121–188 alerts were lost while their senders timed out.
+- **The delivery circuit breaker is on in every profile** (threshold 5), not only
+  under `production`. Off, 300 pages to one unreachable webhook held the
+  worker's delivery stage for 7.5 minutes, during which nobody else was paged.
+  `NXS_ANOMALY_CIRCUIT_BREAKER_THRESHOLD=0` still turns it off.
+- **ChatOps `status` and `alerts` no longer serialize every chat.** They took the
+  command lock and loaded every integration (3 773 rows, 3.6 MB, on a long-lived
+  stand) to read team ids, which held ChatOps to about two commands a second for
+  the whole installation. They now read team ids only and take no lock.
+
+### Changed
+- Closing the phone's event stream is no longer logged as
+  `mobile_stream_read_failed`.
+
 ## [1.9.15] — 2026-10-03
 
 ### Changed

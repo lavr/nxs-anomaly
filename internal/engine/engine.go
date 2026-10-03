@@ -444,7 +444,12 @@ func pageEnvelope(items []map[string]any, total, limit, offset int) map[string]a
 	if items == nil {
 		items = []map[string]any{}
 	}
-	return map[string]any{"items": items, "total": total, "limit": limit, "offset": offset}
+	page := map[string]any{"items": items, "total": total, "limit": limit, "offset": offset}
+	// Past store.ListTotalCap the store estimates instead of counting.
+	if total > store.ListTotalCap {
+		page["total_estimated"] = true
+	}
+	return page
 }
 
 // DeleteEntity removes an entity from an allowed collection.

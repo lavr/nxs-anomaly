@@ -364,7 +364,8 @@ export function AlertGroupsPage() {
               }
             />
             <Text size="sm" c="dimmed">
-              {plural('groups.total', total)}
+              {groups.data?.total_estimated ? '≈ ' : ''}
+            {plural('groups.total', total)}
             </Text>
           </Group>
         </Group>

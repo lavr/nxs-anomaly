@@ -175,6 +175,8 @@ export interface Page<T> {
   total: number;
   limit: number;
   offset: number;
+  /** True when total is an estimate: listings count exactly up to 10 000 rows. */
+  total_estimated?: boolean;
 }
 
 /** One entry of GET /api/v1/history. Its collections are nullable: the engine

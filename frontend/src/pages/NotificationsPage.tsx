@@ -149,6 +149,7 @@ export function NotificationsPage() {
             w={220}
           />
           <Text size="sm" c="dimmed" ml="auto">
+            {notifications.data?.total_estimated ? '≈ ' : ''}
             {plural('notifications.total', total)}
           </Text>
         </Group>

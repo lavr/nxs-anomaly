@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "nxs-anomaly native API",
-    "version": "1.9.15",
+    "version": "1.9.16",
     "description": "The native /api/v1 contract for nxs-anomaly (API, worker, frontend). This is the authoritative contract; the Grafana-compatibility surface under /api/internal/v1 is a compatibility shim and is NOT part of this contract. The core payloads — user, team, schedule, escalation chain, integration, alert group, alert, notification, delivery attempt — are modelled field by field, with `required` reflecting exactly the keys the engine writes unconditionally; every one still allows additional properties because the underlying storage is JSONB. Remaining resources use the open `Entity` schema. Drift between this document and the router is gated by internal/server/openapi_contract_test.go, and the frontend compiles against types generated from this file (frontend/src/api/schema.d.ts).",
     "license": {
       "name": "Apache-2.0"
@@ -3297,6 +3297,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         },
         "additionalProperties": true
@@ -3324,6 +3328,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         },
         "additionalProperties": true
@@ -3351,6 +3359,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         },
         "description": "Pagination envelope returned by list endpoints whose item type is not modelled."
@@ -4807,6 +4819,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5279,6 +5295,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5305,6 +5325,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5331,6 +5355,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5409,6 +5437,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5435,6 +5467,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5461,6 +5497,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5487,6 +5527,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5513,6 +5557,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5539,6 +5587,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },
@@ -5698,6 +5750,10 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "total_estimated": {
+            "type": "boolean",
+            "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
           }
         }
       },

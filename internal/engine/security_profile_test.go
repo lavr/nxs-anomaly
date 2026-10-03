@@ -45,6 +45,19 @@ func TestProductionProfileDeliveryDefaults(t *testing.T) {
 		if cfg.BlockPrivateWebhooks {
 			t.Error("non-production must not block private webhooks unless asked")
 		}
+		// The breaker is not a security setting: a dead target must not stall
+		// everyone's pages on a stand without a profile either.
+		if cfg.CircuitBreakerThreshold != 5 {
+			t.Errorf("breaker threshold without a profile = %d, want 5", cfg.CircuitBreakerThreshold)
+		}
+	})
+
+	t.Run("an explicit 0 turns the breaker off", func(t *testing.T) {
+		t.Setenv("NXS_ANOMALY_PROFILE", "")
+		t.Setenv("NXS_ANOMALY_CIRCUIT_BREAKER_THRESHOLD", "0")
+		if got := DeliveryConfigFromEnv().CircuitBreakerThreshold; got != 0 {
+			t.Errorf("breaker threshold with an explicit 0 = %d, want 0", got)
+		}
 	})
 
 	t.Run("explicit env overrides the profile", func(t *testing.T) {

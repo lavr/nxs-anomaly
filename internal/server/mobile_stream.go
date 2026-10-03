@@ -144,6 +144,10 @@ func (srv *Server) handleMobileEvents(w http.ResponseWriter, r *http.Request) {
 			// A failed read is not the end of the stream: the database may be
 			// restarting, and dropping the connection would send every phone
 			// into a reconnect loop at exactly the wrong moment.
+			if ctx.Err() != nil {
+				// The phone hung up mid-read: not a failure, and not news.
+				return
+			}
 			slog.Warn("mobile_stream_read_failed", "user_id", actor.ID, "error", err)
 			if !send("error", map[string]any{"detail": "could not read alert groups"}) {
 				return
