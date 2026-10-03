@@ -18,6 +18,14 @@ semantic versioning once it reaches 1.0.
   carried from the alert to its group. All five are empty strings when unknown.
   The built-in ChatOps text ends with the group's page when
   `NXS_ANOMALY_PUBLIC_URL` is set.
+- **ChatOps channels hear what happened to the alert they showed.** When a
+  group is acknowledged, unacknowledged or resolved — from the UI, the API, a
+  chat command or button, the source or a `RESOLVE` step — each channel it was
+  posted to gets a status message through the delivery queue. Off by default;
+  `NXS_ANOMALY_CHATOPS_STATUS_UPDATES=true` turns it on. Personal resolve
+  notices still follow `NXS_ANOMALY_NOTIFY_ON_RESOLVE` alone. Templates see the
+  change as `{{ .event }}`; `user_name` and `user_username` are now always
+  defined (empty when the message has no recipient person).
 
 ## [1.9.20] — 2026-10-06
 
