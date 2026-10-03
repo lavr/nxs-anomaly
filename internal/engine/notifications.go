@@ -220,7 +220,11 @@ func (e *Engine) fanoutChatopsNotifications(state *store.State, g model.AlertGro
 		if platform == "telegram" {
 			idemKey := fmt.Sprintf("%s:%s:telegram:%s:%s", groupID, userID, channelName, stepKey)
 			ntf := buildNotification(g, userID, "telegram", channelName, reason, timestamp, idemKey)
-			ntf.ScheduleDelivery(notificationPayload(g, user, reason))
+			payload := notificationPayload(g, user, reason)
+			// Marks this as the team's channel rather than a person's chat, so
+			// the Telegram adapter reads the chatops template first.
+			payload["chatops_channel_id"] = channelID
+			ntf.ScheduleDelivery(payload)
 			addNotification(state, ntf, seen)
 			notificationID = ntf.ID()
 		} else {
@@ -374,6 +378,15 @@ func notificationPayload(g model.AlertGroup, user map[string]any, reason string)
 	if tp := g.TraceParent(); tp != "" {
 		p["trace_parent"] = tp
 	}
+	// Carried for the same reason, and only when there are any, so a payload
+	// from a source without links keeps the shape it always had.
+	if links := g.SourceLinks(); len(links) > 0 {
+		sl := make(map[string]any, len(links))
+		for k, v := range links {
+			sl[k] = v
+		}
+		p["source_links"] = sl
+	}
 	if user != nil {
 		p["user"] = map[string]any{
 			"id":       utils.StrVal(user, "id"),
@@ -517,6 +530,15 @@ func renderNotificationText(notification, payload map[string]any, templateStr st
 		if u, ok := payload["user"].(map[string]any); ok {
 			ctx["user_name"] = utils.StrVal(u, "name")
 			ctx["user_username"] = utils.StrVal(u, "username")
+		}
+		// Every link key is present, empty when unknown: the renderer treats a
+		// missing key as an error and falls back to raw text, and a template
+		// written for a source that sends a panel link must not break on an
+		// alert that has none, or on a deployment without a public URL.
+		ctx["group_url"] = utils.StrVal(payload, "group_url")
+		links, _ := payload["source_links"].(map[string]any)
+		for _, k := range sourceLinkKeys {
+			ctx[k] = utils.StrVal(links, k)
 		}
 		return renderTemplate(templateStr, ctx)
 	}

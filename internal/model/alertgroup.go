@@ -382,6 +382,44 @@ func (g AlertGroup) ResolveNotifiedAt() string { return utils.StrVal(g.d.Extra, 
 // MarkResolveNotified records that the resolution notice has been sent.
 func (g AlertGroup) MarkResolveNotified(ts string) { g.d.Extra["resolve_notified_at"] = ts }
 
+// SourceLinks are the links the source sent with the group's latest alert that
+// carried any — the rule or query that fired (generator_url) and, for Grafana,
+// the dashboard, the panel and a ready-made silence. Keyed by those names.
+//
+// Kept on the group because the notification is built from the group, not from
+// an alert: the escalation step that pages somebody minutes later never sees
+// the alert that started it. Same reasoning as TraceParent.
+func (g AlertGroup) SourceLinks() map[string]string {
+	raw, _ := g.d.Extra["source_links"].(map[string]any)
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		if s, ok := v.(string); ok && s != "" {
+			out[k] = s
+		}
+	}
+	return out
+}
+
+// SetSourceLinks replaces the links with the ones an incoming alert carried.
+// An alert that carried none leaves the previous set alone: a source that sends
+// a link on the first event and drops it on repeats should not lose it, and an
+// absent key keeps the canonical shape of groups whose sources send no links.
+func (g AlertGroup) SetSourceLinks(links map[string]string) {
+	m := make(map[string]any, len(links))
+	for k, v := range links {
+		if v != "" {
+			m[k] = v
+		}
+	}
+	if len(m) == 0 {
+		return
+	}
+	g.d.Extra["source_links"] = m
+}
+
 // Optional fields not always present (direct-paging shape, silenced state).
 func (g AlertGroup) Description() string     { return utils.StrVal(g.d.Extra, "description") }
 func (g AlertGroup) IntegrationType() string { return utils.StrVal(g.d.Extra, "integration_type") }
