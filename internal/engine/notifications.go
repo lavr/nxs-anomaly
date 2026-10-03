@@ -234,7 +234,12 @@ func (e *Engine) fanoutChatopsNotifications(state *store.State, g model.AlertGro
 		if platform == "telegram" {
 			ref.Channel, ref.Target = "telegram", channelName
 		}
-		ntf := buildNotification(g, userID, ref.Channel, ref.Target, reason, timestamp, idemKey)
+		// No user_id: the channel's one message per step belongs to the team,
+		// not to whichever member happened to be paged first. Attributed to a
+		// member, it would be deleted with that member's account (the
+		// foreign key cascades) and scrubbed by their personal-data erasure.
+		// The member stays in the payload, where templates read user_name.
+		ntf := buildNotification(g, "", ref.Channel, ref.Target, reason, timestamp, idemKey)
 		payload := notificationPayload(g, user, reason)
 		// Marks this as the team's channel rather than a person's chat, so
 		// the Telegram adapter reads the chatops template first.

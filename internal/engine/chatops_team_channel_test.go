@@ -96,3 +96,26 @@ func TestTeamChannelHearsEachStepExecution(t *testing.T) {
 		t.Errorf("channel received %d notifications over two step executions, want 2", got)
 	}
 }
+
+// The channel's message belongs to the team, not to the member paged first:
+// attributed to a member it would go with that member's account.
+func TestTeamChannelMessageBelongsToNoMember(t *testing.T) {
+	state := teamChannelState()
+	g := teamChannelGroup()
+	e := honestyEngine(newMemStore(), DeliveryConfig{})
+
+	e.notifyUsers(state, g, []string{"u_a", "u_b"}, "escalation step", utils.ToISO(utils.UTCNow()))
+
+	for _, rec := range state.Notifications {
+		n := rec.(model.Notification)
+		if n.Channel() != "chatops" && n.Target() != "-100123" {
+			continue
+		}
+		if n.UserID() != "" {
+			t.Errorf("%s message to %s is attributed to %s", n.Channel(), n.Target(), n.UserID())
+		}
+		if user, _ := n.Payload()["user"].(map[string]any); utils.StrVal(user, "id") == "" {
+			t.Errorf("%s message lost the member templates read user_name from", n.Channel())
+		}
+	}
+}
