@@ -4,6 +4,36 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.15] — 2026-10-03
+
+### Changed
+- **The long-list `UsersPage` test gets its own CI-safe timeout.** 120 rows
+  plus four keystrokes is normally well under the global 20 s `testTimeout`,
+  but it ran at 20698 ms on a loaded CI runner (23 parallel coverage workers
+  on one pod) and failed the pipeline. The test now carries an explicit
+  35 s timeout instead of raising the budget for every test.
+
+## [1.9.14] — 2026-10-03
+
+### Fixed
+- **A database restart in the middle of a delivery no longer sends the page
+  twice, ten minutes later.** The pages went out but their outcome could not be
+  saved, so the rows stayed claimed until the reaper returned them (the claim
+  timeout, about ten minutes by default) and they were delivered again. The
+  worker now keeps the unsaved outcomes and saves them first on its next cycle;
+  an outcome is only written to a row this worker still holds. Same for retries.
+- **The webhook answers 503 with Retry-After while the database is down.** The
+  signature check looks the integration up first, and a failure there came back
+  as a 500 that was not logged — 72 of 2 700 alerts during a PostgreSQL restart
+  under load, alerts a sender does not retry. It now goes through the same
+  classification as the rest of ingest.
+- **Reopening or closing a group updates its alerts even if the client hangs
+  up.** The follow-up write ran on the request's context, so a dropped
+  connection left a reopened group's alerts marked resolved. It now runs on its
+  own, bounded to ten seconds.
+- **The menu button on a phone-sized screen has a name** ("Open navigation"),
+  so a screen reader announces more than "button".
+
 ## [1.9.13] — 2026-10-03
 
 ### Security

@@ -1,14 +1,17 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nixys/nxs-anomaly/internal/engine"
+	"github.com/nixys/nxs-anomaly/internal/storetest"
 )
 
 // TestIngestAnswers503WhenTheDatabaseIsGone: the status code decides whether the
@@ -56,5 +59,32 @@ func TestWriteIngestErrorBusyIs503WithRetryAfter(t *testing.T) {
 	writeIngestError(w, engine.ErrIngestBusy, "webhook", "k1")
 	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
 		t.Fatalf("busy: code=%d Retry-After=%q, want 503 with Retry-After", w.Code, w.Header().Get("Retry-After"))
+	}
+}
+
+// lookupFailingStore fails the integration lookup the webhook does for its
+// signature check, as it fails while PostgreSQL restarts.
+type lookupFailingStore struct {
+	*storetest.Store
+	err error
+}
+
+func (s *lookupFailingStore) FindIntegrationByKey(context.Context, string) (map[string]any, error) {
+	return nil, s.err
+}
+
+// TestWebhookSignatureLookupAnswers503WhenTheDatabaseIsGone: on the 1.9.13
+// stand, a PostgreSQL restart under 30 alerts/s answered 72 webhooks with a 500
+// that never reached the log — the signature check's integration lookup failed
+// before writeIngestError could classify it. Those alerts were not retried.
+func TestWebhookSignatureLookupAnswers503WhenTheDatabaseIsGone(t *testing.T) {
+	srv, st := newTestServer()
+	srv.store = &lookupFailingStore{Store: st, err: &pgconn.PgError{Code: "57P03", Message: "the database system is shutting down"}}
+	r := httptest.NewRequest(http.MethodPost, "/integrations/v1/webhook/key_x", strings.NewReader(`{"title":"t"}`))
+	r.SetPathValue("key", "key_x")
+	w := httptest.NewRecorder()
+	srv.handleWebhook(w, r)
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
+		t.Fatalf("webhook while the database is down: %d (Retry-After %q), want 503 with Retry-After", w.Code, w.Header().Get("Retry-After"))
 	}
 }

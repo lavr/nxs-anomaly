@@ -211,6 +211,7 @@ export const en = {
   'shell.themeAria': 'Toggle theme',
   'shell.signOut': 'Sign out',
   'shell.language': 'Language',
+  'shell.navAria': 'Open navigation',
   'shell.languageAria': 'Change language',
 
   // ── Sign-in ────────────────────────────────────────────────────────────────

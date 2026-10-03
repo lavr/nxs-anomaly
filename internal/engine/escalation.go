@@ -11,6 +11,9 @@ import (
 	"github.com/nixys/nxs-anomaly/internal/utils"
 )
 
+// alertStatusSyncTimeout bounds the post-commit alert status write.
+const alertStatusSyncTimeout = 10 * time.Second
+
 // syncAlertStatusForGroups carries a group transition down to the alerts that
 // belong to it: closing a group closes its alerts, reopening one reopens them.
 //
@@ -23,6 +26,12 @@ func (e *Engine) syncAlertStatusForGroups(ctx context.Context, groupIDs []string
 	if len(groupIDs) == 0 {
 		return
 	}
+	// Not the request's context: the transition has committed, and a client
+	// that hangs up now (a phone losing signal, a sender timing out under load)
+	// must not leave a reopened group's alerts marked resolved. Bounded so a
+	// stuck database cannot hold the request forever.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), alertStatusSyncTimeout)
+	defer cancel()
 	if _, err := e.store.SetAlertStatusForGroups(ctx, groupIDs, status); err != nil {
 		slog.Warn("alert_status_sync_failed",
 			"groups", groupIDs, "status", status, "err", err,

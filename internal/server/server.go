@@ -33,7 +33,8 @@ var Version = "dev"
 const maxRequestBody = 4 * 1024 * 1024 // 4 MiB
 
 // errWebhookSigInvalid is returned by verifyWebhookSig when the signature doesn't match (400).
-// Any other error from verifyWebhookSig is a DB/internal error (500).
+// Any other error from verifyWebhookSig is a lookup failure, answered by
+// writeIngestError (503 while the database is unavailable, otherwise 500).
 var errWebhookSigInvalid = fmt.Errorf("webhook signature validation failed")
 
 // Server is the HTTP server wrapping the engine.

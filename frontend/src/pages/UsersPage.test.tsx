@@ -94,17 +94,24 @@ describe('UsersPage', () => {
     expect(screen.getByText('Person bob')).toBeInTheDocument();
   });
 
-  it('draws a long list a page at a time and finds a person on a later page', async () => {
-    // 624 people drawn at once took the page 3–4.6 s to appear and 6 s to
-    // answer a duty toggle.
-    renderPage(Array.from({ length: 120 }, (_, i) => user(`p${String(i).padStart(3, '0')}`)));
+  it(
+    'draws a long list a page at a time and finds a person on a later page',
+    async () => {
+      // 624 people drawn at once took the page 3–4.6 s to appear and 6 s to
+      // answer a duty toggle. 120 rows plus four keystrokes is normally well
+      // under the 20s default, but it ran at 20698ms on a loaded CI runner
+      // (23 parallel coverage workers on one pod) — the global timeout is a
+      // budget for ordinary tests, not for this one, so it gets its own.
+      renderPage(Array.from({ length: 120 }, (_, i) => user(`p${String(i).padStart(3, '0')}`)));
 
-    expect(await screen.findByText('Person p000')).toBeInTheDocument();
-    expect(screen.queryByText('Person p119')).not.toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Search by name'), 'p119');
-    expect(await screen.findByText('Person p119')).toBeInTheDocument();
-    expect(screen.queryByText('Person p000')).not.toBeInTheDocument();
-  });
+      expect(await screen.findByText('Person p000')).toBeInTheDocument();
+      expect(screen.queryByText('Person p119')).not.toBeInTheDocument();
+      await userEvent.type(screen.getByLabelText('Search by name'), 'p119');
+      expect(await screen.findByText('Person p119')).toBeInTheDocument();
+      expect(screen.queryByText('Person p000')).not.toBeInTheDocument();
+    },
+    35000,
+  );
 
   it('shows an empty state rather than a bare table', async () => {
     renderPage([]);
