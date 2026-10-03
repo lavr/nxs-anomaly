@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## Unreleased
+
+### Fixed
+- **A team's ChatOps channel hears about an escalation step once.** The
+  channel belongs to every member of its team, and its notification was keyed
+  on the member, so a step paging a team of five posted the same alert to the
+  team's channel five times (and wrote five history rows). It is now keyed on
+  the group, the channel and the step execution; a REPEAT or a restarted chain
+  still posts again. The one message belongs to no member, so deleting the
+  member paged first no longer deletes it with their account.
+
 ## [1.9.16] — 2026-10-03
 
 ### Fixed
