@@ -48,6 +48,10 @@ type deliveryOutcome struct {
 	// adapter was asked to keep it (see ChatOps message_update). Saved onto the
 	// notification on delivery.
 	MessageID string
+	// NotSent marks a failure that never reached the provider — a delivery
+	// waiting on another one. It is retried like any failure, but the circuit
+	// breaker does not count it: the provider said nothing.
+	NotSent bool
 }
 
 // Delivery statuses an adapter may report.

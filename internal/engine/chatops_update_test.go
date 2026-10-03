@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/nixys/nxs-anomaly/internal/authz"
 	"github.com/nixys/nxs-anomaly/internal/model"
@@ -261,5 +262,108 @@ func TestMessageUpdateURLIsMaskedForReaders(t *testing.T) {
 	update, _ := item["message_update"].(map[string]any)
 	if u := utils.StrVal(update, "url"); strings.Contains(u, "chat.example.com") {
 		t.Errorf("message_update.url = %q, want masked", u)
+	}
+}
+
+// An edit replaces the message, so an older status retried after a newer one
+// must not be sent: it would turn "resolved" back into "acknowledged".
+func TestOutdatedStatusEditIsNotSent(t *testing.T) {
+	e, ms, api := updateEngine(t)
+	ms.seed("alert_groups", map[string]any{"id": "grp_1", "chatops_status_seq": 2})
+	alert := alertNotification(model.NotificationDelivered, "m-42")
+
+	ms.seed("notifications", alert)
+	older := notificationFor("chatops", "chat_1", map[string]any{
+		"alert_group_id": "grp_1", "title": "Disk full", "chatops_channel_id": "chat_1",
+		"chatops_event": chatopsEventAcknowledged, "chatops_status_seq": 1,
+		"chatops_alert_notification_id": utils.StrVal(alert, "id"),
+	})
+	res := e.deliverNotificationViaAdapter(context.Background(), older)
+	if res.Status != deliverySkipped || res.ProviderStatus != skipSuperseded {
+		t.Fatalf("outdated edit = %+v, want skipped as superseded", res)
+	}
+	if got := api.log(); len(got) != 0 {
+		t.Fatalf("outdated edit reached the platform: %v", got)
+	}
+
+	newer := notificationFor("chatops", "chat_1", map[string]any{
+		"alert_group_id": "grp_1", "title": "Disk full", "chatops_channel_id": "chat_1",
+		"chatops_event": chatopsEventResolved, "chatops_status_seq": 2,
+		"chatops_alert_notification_id": utils.StrVal(alert, "id"),
+	})
+	if res := e.deliverNotificationViaAdapter(context.Background(), newer); res.Status != deliveryDelivered {
+		t.Fatalf("current edit = %+v", res)
+	}
+	if got := api.log(); strings.Join(got, ",") != "PUT /api/messages/m-42" {
+		t.Errorf("requests = %v", got)
+	}
+}
+
+// A superseded edit is not "nobody was told": it must not reach the skipped
+// metric behind the NotificationsSkippedNoTransport alert.
+func TestSupersededEditIsNotCountedAsSkipped(t *testing.T) {
+	sink := newRecordingSink()
+	e := &Engine{metrics: sink}
+	n := model.WrapNotification(notificationFor("chatops", "chat_1", nil))
+	e.applyOutcome(n, skipped(skipSuperseded, "newer"), utils.ToISO(utils.UTCNow()))
+	if n.Status() != model.NotificationSkipped {
+		t.Errorf("status = %s, want skipped", n.Status())
+	}
+	if len(sink.skipped) != 0 {
+		t.Errorf("superseded edit counted as skipped: %v", sink.skipped)
+	}
+}
+
+// Waiting for the alert is not a provider failure: a burst of waiting edits
+// must not open the channel's breaker and hold back the alert itself.
+func TestWaitingEditDoesNotTripTheBreaker(t *testing.T) {
+	e, ms, api := updateEngine(t)
+	e.breaker = newCircuitBreaker(1, time.Hour)
+	ms.seed("alert_groups", map[string]any{"id": "grp_1"})
+	pending := alertNotification(model.NotificationRetryScheduled, "")
+	ms.seed("notifications", pending)
+	status := makeNotification("ntf_status", model.NotificationDeliveryScheduled, "chatops", "chat_1", map[string]any{
+		"alert_group_id": "grp_1", "title": "Disk full", "chatops_channel_id": "chat_1",
+		"chatops_event": chatopsEventAcknowledged, "chatops_status_seq": 1,
+		"chatops_alert_notification_id": utils.StrVal(pending, "id"),
+	})
+	ms.seed("notifications", status)
+
+	if _, err := e.ProcessNotificationDeliveries(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := model.WrapNotification(ms.row("notifications", "ntf_status")).Status(); got != model.NotificationRetryScheduled {
+		t.Fatalf("waiting edit is %s, want retry_scheduled", got)
+	}
+	if !e.breaker.Allow("chatops:chat_1", utils.UTCNow()) {
+		t.Error("the breaker opened on a delivery that never reached the provider")
+	}
+	if got := api.log(); len(got) != 0 {
+		t.Errorf("requests = %v, want none while the alert is pending", got)
+	}
+}
+
+// The edit URL often carries a credential, and a transport error quotes the
+// URL whole; the attempt row and last_error are readable by anyone who can see
+// the group.
+func TestEditErrorDoesNotQuoteTheURL(t *testing.T) {
+	ms := newMemStore()
+	ms.seed("chatops_channels", map[string]any{
+		"id": "chat_1", "platform": "generic", "name": "#sre", "webhook_url": "http://127.0.0.1:1/hooks/1",
+		"message_update": map[string]any{"url": "http://127.0.0.1:1/bot-s3cret-token/messages/{message_id}?key=k3y"},
+	})
+	e := deliveryEngine(ms)
+	alert := alertNotification(model.NotificationDelivered, "m-42")
+	res := deliverStatus(t, e, ms, alert, 0)
+	if res.Status != deliveryFailed {
+		t.Fatalf("outcome = %+v, want a transport failure", res)
+	}
+	for _, leak := range []string{"s3cret", "k3y"} {
+		if strings.Contains(res.Err, leak) || strings.Contains(res.Response, leak) {
+			t.Errorf("stored diagnostics quote the edit URL: err=%q response=%q", res.Err, res.Response)
+		}
+	}
+	if !strings.Contains(res.Err, "http://127.0.0.1:1/…") {
+		t.Errorf("err = %q, want the endpoint's scheme and host kept", res.Err)
 	}
 }

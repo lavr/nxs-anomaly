@@ -154,6 +154,16 @@ func (e *Engine) chatopsAlertMessageID(ctx context.Context, payload map[string]a
 // the platform refused the edit — and the caller posts the status as a new
 // message instead, which is what a channel without message_update gets anyway.
 func (e *Engine) updateChatopsMessage(ctx context.Context, ntf, channel, payload map[string]any, update *chatopsMessageUpdate, text string, headers map[string]string) (res deliveryOutcome, done bool) {
+	if superseded, err := e.chatopsStatusSuperseded(ctx, payload); err != nil {
+		return failed("chatops_update", err.Error(), 0, ""), true
+	} else if superseded {
+		// An edit replaces the message, so the latest status is the only one
+		// worth sending: an acknowledge that failed and is retried after the
+		// resolve went through would otherwise turn "resolved" back into
+		// "acknowledged". Not a new message either — the newer edit carries
+		// the news.
+		return skipped(skipSuperseded, "a newer status of this alert replaces this one"), true
+	}
 	id, pending, err := e.chatopsAlertMessageID(ctx, payload)
 	if err != nil {
 		return failed("chatops_update", err.Error(), 0, ""), true
@@ -164,7 +174,13 @@ func (e *Engine) updateChatopsMessage(ctx context.Context, ntf, channel, payload
 		// as a separate message and then the alert below it; on the last
 		// attempt the status goes out on its own rather than not at all.
 		if pending && model.WrapNotification(ntf).RetryCount()+1 < e.deliveryCfg.MaxRetries {
-			return failed("chatops_update", "the alert message is not delivered yet", 0, ""), true
+			res = failed("chatops_update", "the alert message is not delivered yet", 0, "")
+			// Nothing was sent, so the channel's breaker must not count it: a
+			// burst of acknowledgements waiting on one slow alert would open
+			// the breaker on a healthy channel, and hold back the very alert
+			// they wait for.
+			res.NotSent = true
+			return res, true
 		}
 		return deliveryOutcome{}, false
 	}
@@ -176,13 +192,14 @@ func (e *Engine) updateChatopsMessage(ctx context.Context, ntf, channel, payload
 	// Checked here for the same reason as the webhook URL: the dispatch
 	// pre-flight judged the notification's target, which is the channel id.
 	if ok, detail := e.deliveryCfg.Channels.DestinationAllowed(target); !ok {
-		return skipped(skipDestinationNotAllowed, detail), true
+		return scrubEditURL(skipped(skipDestinationNotAllowed, detail), target), true
 	}
 	platform := utils.StrVal(channel, "platform")
 	proxyChannel := e.deliveryCfg.chatopsProxyChannel(platform)
 	res, _ = sendJSONGuarded(ctx, e.deliveryCfg.clientFor(proxyChannel), update.Method, target,
 		map[string]any{"text": text, "message_id": id}, e.deliveryCfg.ssrfGuardFor(proxyChannel), headers, 0)
 	res.ProviderStatus = platform + "_chatops_update"
+	res = scrubEditURL(res, target)
 	// A refusal is an answer, not an outage: the message was deleted, is too
 	// old to edit, or the bot may not touch it. Retrying asks the same
 	// question again; posting the news as a new message still tells the room.
@@ -193,4 +210,51 @@ func (e *Engine) updateChatopsMessage(ctx context.Context, ntf, channel, payload
 		return deliveryOutcome{}, false
 	}
 	return res, true
+}
+
+// skipSuperseded is the reason on a status edit that a newer status of the
+// same alert made pointless. Not a missing transport: nobody went untold.
+const skipSuperseded = "superseded"
+
+// chatopsStatusSuperseded reports whether the group has had a newer status
+// change than the one this message carries. The group's counter is written
+// when a status is queued, so an older edit still waiting for a retry sees the
+// newer one even before that one is delivered.
+func (e *Engine) chatopsStatusSuperseded(ctx context.Context, payload map[string]any) (bool, error) {
+	seq := utils.IntVal(payload, "chatops_status_seq")
+	if seq == 0 {
+		return false, nil
+	}
+	raw, err := e.store.GetItem(ctx, "alert_groups", utils.StrVal(payload, "alert_group_id"))
+	if err != nil || raw == nil {
+		return false, err
+	}
+	return model.WrapAlertGroup(raw).ChatopsStatusSeq() > seq, nil
+}
+
+// scrubEditURL takes the edit URL out of what is stored about the attempt.
+//
+// The URL is an API address that often carries its credential in the path or
+// the query, and a transport error quotes it whole (Put "https://…": dial tcp
+// …). The channel masks the URL on its read paths; the notification's
+// last_error and the attempt row are read by anyone who can see the group, so
+// they keep the scheme and host — enough to tell which endpoint failed — and
+// nothing after them.
+func scrubEditURL(res deliveryOutcome, target string) deliveryOutcome {
+	shown := "the message_update URL"
+	forms := []string{target}
+	if u, err := url.Parse(target); err == nil {
+		if u.Host != "" {
+			shown = u.Scheme + "://" + u.Host + "/…"
+		}
+		forms = append(forms, u.String(), u.Redacted())
+	}
+	for _, f := range forms {
+		if f == "" {
+			continue
+		}
+		res.Err = strings.ReplaceAll(res.Err, f, shown)
+		res.Response = strings.ReplaceAll(res.Response, f, shown)
+	}
+	return res
 }
