@@ -441,6 +441,21 @@ func (g AlertGroup) AddNotifiedChatChannel(ref ChatChannelRef) {
 	g.d.Extra["notified_chatops_channels"] = next
 }
 
+// ChatopsStatusSeq counts the status changes the group's ChatOps channels
+// were told about; 0 when there were none.
+func (g AlertGroup) ChatopsStatusSeq() int { return utils.IntVal(g.d.Extra, "chatops_status_seq") }
+
+// NextChatopsStatusSeq numbers a new status change and returns its number.
+//
+// A counter rather than the transition's timestamp: timestamps are kept to the
+// second, and an acknowledge, an undo and a second acknowledge inside one
+// second are three changes the channel must hear about, not one.
+func (g AlertGroup) NextChatopsStatusSeq() int {
+	n := g.ChatopsStatusSeq() + 1
+	g.d.Extra["chatops_status_seq"] = n
+	return n
+}
+
 // ResolveNotifiedAt is when the "this is over" notice went out, empty when it
 // has not. Resolve itself is idempotent and allowed from any state, so without
 // this a second resolve would page everyone again.

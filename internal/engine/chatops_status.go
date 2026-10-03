@@ -49,15 +49,18 @@ func (e *Engine) notifyChatopsStatus(state *store.State, g model.AlertGroup, eve
 		return
 	}
 	reason := chatopsStatusReason(event, actor)
+	// Numbered per group, so each transition is its own message — a group can
+	// be acknowledged, taken back and acknowledged again within a second, and
+	// each of those is news. The number is written on the group in the same
+	// transaction, so a mutator that is re-run computes the same keys.
+	seq := g.NextChatopsStatusSeq()
 	for _, ch := range channels {
-		// The transition's timestamp makes each one its own message: a group
-		// can be acknowledged, taken back and acknowledged again, and each of
-		// those is news. A mutator that is re-run computes the same key.
-		idemKey := fmt.Sprintf("%s:chatops:%s:%s:%s", g.ID(), ch.ID, event, timestamp)
+		idemKey := fmt.Sprintf("%s:chatops:%s:%s:%d", g.ID(), ch.ID, event, seq)
 		ntf := buildNotification(g, "", ch.Channel, ch.Target, reason, timestamp, idemKey)
 		payload := notificationPayload(g, nil, reason)
 		payload["chatops_channel_id"] = ch.ID
 		payload["chatops_event"] = event
+		payload["chatops_status_seq"] = seq
 		// The alert message this status belongs to. Its platform message id is
 		// only known once that message is delivered, so it is looked up at
 		// delivery rather than copied here.

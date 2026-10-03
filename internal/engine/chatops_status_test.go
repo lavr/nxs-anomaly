@@ -246,3 +246,33 @@ func TestTemplateContextHasEvent(t *testing.T) {
 		t.Errorf("alert text = %q", got)
 	}
 }
+
+// An acknowledge, its undo and a second acknowledge are three messages even
+// inside one second — the keys must not be built from a timestamp kept to the
+// second, or the database's unique key drops the second acknowledge.
+func TestStatusKeysAreDistinctWithinASecond(t *testing.T) {
+	ms := statusStore("https://chat.example.com/hooks/1")
+	e := statusEngine(ms)
+	id := pagedGroup(t, e, ms)
+
+	if _, err := e.AcknowledgeGroup(adminCtx(), id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.UnacknowledgeGroup(adminCtx(), id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.AcknowledgeGroup(adminCtx(), id); err != nil {
+		t.Fatal(err)
+	}
+	keys := map[string]bool{}
+	var count int
+	for _, rows := range statusMessages(ms) {
+		for _, row := range rows {
+			keys[model.WrapNotification(row).IdempotencyKey()] = true
+			count++
+		}
+	}
+	if count != 3 || len(keys) != 3 {
+		t.Errorf("%d status messages with %d distinct keys, want 3 and 3", count, len(keys))
+	}
+}
