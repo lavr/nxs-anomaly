@@ -26,6 +26,13 @@ semantic versioning once it reaches 1.0.
   notices still follow `NXS_ANOMALY_NOTIFY_ON_RESOLVE` alone. Templates see the
   change as `{{ .event }}`; `user_name` and `user_username` are now always
   defined (empty when the message has no recipient person).
+- **A ChatOps channel can edit the alert message instead of adding a line.**
+  With `message_update` (`method`, `url` with `{message_id}`,
+  `message_id_path`) on a webhook-backed channel, the id the platform returns
+  for the posted alert is kept on its notification, and a status change is sent
+  as an edit of that message through the delivery queue. Without the setting,
+  without an id, or when the platform refuses the edit, the status is posted as
+  a new message.
 
 ## [1.9.20] — 2026-10-06
 

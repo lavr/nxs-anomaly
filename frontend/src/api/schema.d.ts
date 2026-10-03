@@ -3101,6 +3101,18 @@ export interface components {
             } | null;
             /** @description Channel id on the platform itself (Slack channel id, Telegram chat id); inbound commands name this, not the internal id. */
             external_id: string;
+            /** @description How to edit a message posted through webhook_url, so that acknowledge, unacknowledge and resolve rewrite the alert's message instead of posting a new one. The id of the posted message is read from the response to the post at message_id_path; the edit is a request with method to url, where {message_id} is replaced by that id, with the post's JSON body plus "message_id". Without it, without an id, or when the platform refuses the edit with a 4xx, the status is posted as a new message. Ignored for the telegram platform. null or {} removes it. url may be an env: reference and is masked for readers who may not edit configuration. */
+            message_update?: {
+                /**
+                 * @description Defaults to PATCH.
+                 * @enum {string}
+                 */
+                method?: "POST" | "PUT" | "PATCH";
+                /** @description Edit endpoint, e.g. https://chat.example.com/api/messages/{message_id}. Required unless the object is empty, which removes the setting. */
+                url?: string;
+                /** @description Dotted JSON path of the message id in the post's response, e.g. id, result.message_id, messages.0.id. Defaults to id. */
+                message_id_path?: string;
+            } | null;
             notifications_enabled: boolean;
             /** @description Name of the infrastructure-as-code tool that created this object ("terraform"), absent when a person did. Present means the object is owned by that tool: the API refuses updates and deletes from anyone else, and the web UI disables its own edit controls, because an edit made here would be reverted by the next apply with nothing on screen having said so. */
             provisioned_by?: string;
