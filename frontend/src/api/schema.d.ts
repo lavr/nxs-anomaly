@@ -3104,8 +3104,8 @@ export interface components {
                  * @enum {string}
                  */
                 method?: "POST" | "PUT" | "PATCH";
-                /** @description Edit endpoint, e.g. https://chat.example.com/api/messages/{message_id}. */
-                url: string;
+                /** @description Edit endpoint, e.g. https://chat.example.com/api/messages/{message_id}. Required unless the object is empty, which removes the setting. */
+                url?: string;
                 /** @description Dotted JSON path of the message id in the post's response, e.g. id, result.message_id, messages.0.id. Defaults to id. */
                 message_id_path?: string;
             } | null;

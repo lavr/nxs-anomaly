@@ -671,7 +671,11 @@ api -X PUT "$API/api/v1/chatops/channels/chat_..." -d '{
   failed), or when the platform answers the edit with a 4xx, the status is posted as
   a new message; a 5xx or a timeout is retried like any delivery. If the alert
   itself is still being delivered, the edit waits for it for up to the retry
-  budget, then posts a new message.
+  budget, then posts a new message; that wait does not count against the channel's
+  circuit breaker. An edit is only ever sent for the latest status: an older one
+  still waiting for a retry is dropped (`skipped`, reason `superseded`, not counted
+  in `nxs_anomaly_notifications_skipped_total`) rather than overwrite the newer one.
+  A failed edit's stored error keeps only the scheme and host of `url`.
 - `url` may be an `env:` reference and is masked like `webhook_url`; `null` or `{}`
   removes the setting. A `telegram` channel goes through the bot and ignores it.
 
