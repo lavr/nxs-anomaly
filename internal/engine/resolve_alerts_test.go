@@ -102,3 +102,33 @@ func TestSourceResolveClosesTheEarlierAlertsToo(t *testing.T) {
 	}
 	requireAllStatuses(t, ms, id, model.AlertStatusResolved)
 }
+
+// ctxRecordingStore remembers whether the alert status write saw a context
+// that was already cancelled.
+type ctxRecordingStore struct {
+	*memStore
+	sawCancelled bool
+}
+
+func (s *ctxRecordingStore) SetAlertStatusForGroups(ctx context.Context, groupIDs []string, status string) (int, error) {
+	if ctx.Err() != nil {
+		s.sawCancelled = true
+		return 0, ctx.Err()
+	}
+	return s.memStore.SetAlertStatusForGroups(ctx, groupIDs, status)
+}
+
+// TestAlertStatusSyncOutlivesTheRequest: on the 1.9.13 stand a group was
+// reopened, the client hung up before the follow-up write, and its alerts kept
+// reading "resolved" (alert_status_sync_failed: context canceled). The write
+// comes after the commit, so it must not depend on the client staying around.
+func TestAlertStatusSyncOutlivesTheRequest(t *testing.T) {
+	st := &ctxRecordingStore{memStore: newMemStore()}
+	e := &Engine{store: st}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	e.syncAlertStatusForGroups(ctx, []string{"g1"}, model.AlertStatusFiring)
+	if st.sawCancelled {
+		t.Fatal("the alert status write ran on the request's cancelled context")
+	}
+}

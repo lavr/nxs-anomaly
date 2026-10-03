@@ -204,6 +204,7 @@ export const ru: Messages = {
   'shell.themeAria': 'Переключить тему',
   'shell.signOut': 'Выйти',
   'shell.language': 'Язык',
+  'shell.navAria': 'Открыть меню',
   'shell.languageAria': 'Сменить язык',
 
   // ── Вход ───────────────────────────────────────────────────────────────────

@@ -151,6 +151,11 @@ type Engine struct {
 	// lastDutyGap is the check-in gap last written to the log, as
 	// [missing, on_call]. Same ownership as lastCoverageCheck.
 	lastDutyGap [2]int
+	// unsavedDeliveries and unsavedRetries are outcomes whose save failed (the
+	// database went away mid-cycle); the next cycle saves them before claiming
+	// more. Same ownership as lastCoverageCheck.
+	unsavedDeliveries []deliveryResult
+	unsavedRetries    []retryResult
 	// lastRetentionSweep throttles the archival stage (retention sweep and the
 	// session and rate-bucket pruning). Same ownership as lastCoverageCheck.
 	lastRetentionSweep time.Time

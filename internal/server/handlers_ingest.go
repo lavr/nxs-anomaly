@@ -26,7 +26,11 @@ func (srv *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		if err == errWebhookSigInvalid {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		} else {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
+			// The integration lookup failed. Through writeIngestError so it is
+			// logged and a database restart answers 503 + Retry-After, which the
+			// sender retries, rather than a silent 500, which it drops.
+			srv.metrics.incIngestError("webhook")
+			writeIngestError(w, err, "webhook", key)
 		}
 		return
 	}

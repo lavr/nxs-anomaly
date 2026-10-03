@@ -303,7 +303,7 @@ export function Shell() {
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label={t('shell.navAria')} />
             <Logo />
             <Text fw={600}>nxs-anomaly</Text>
           </Group>

@@ -2,12 +2,14 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/nixys/nxs-anomaly/internal/model"
+	"github.com/nixys/nxs-anomaly/internal/store"
 )
 
 // These tests drive the delivery / retry / batch store round-trips through the
@@ -198,5 +200,59 @@ func TestProcessBatchesFlushReleasesNotification(t *testing.T) {
 	}
 	if got := ms.row("notification_batches", "b1")["status"]; got != "closed" {
 		t.Errorf("batch status = %v, want closed", got)
+	}
+}
+
+// saveFailingStore fails the next failWrites delivery saves, the way a database
+// restart in the middle of a cycle does: the pages went out, the save did not.
+type saveFailingStore struct {
+	*memStore
+	failWrites int
+}
+
+func (s *saveFailingStore) UpdateCollectionsWriteAll(ctx context.Context, loads []store.LoadSpec, save, writeAll []string, mutator func(*store.State) (any, error), lockKey int64) (any, error) {
+	if s.failWrites > 0 {
+		s.failWrites--
+		return nil, errors.New("FATAL: terminating connection due to administrator command (SQLSTATE 57P01)")
+	}
+	return s.memStore.UpdateCollectionsWriteAll(ctx, loads, save, writeAll, mutator, lockKey)
+}
+
+// TestUnsavedDeliveryIsSavedNextCycleNotResent pins the database-restart case
+// from the 1.9.13 stand run: a page delivered while the save failed stayed
+// 'delivering' for the whole ClaimTimeout (10 minutes) and was then sent again.
+// The next cycle must save it without calling the provider a second time.
+func TestUnsavedDeliveryIsSavedNextCycleNotResent(t *testing.T) {
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	ms := newMemStore()
+	ms.seed("notifications", makeNotification("n1", model.NotificationDeliveryScheduled, "webhook", srv.URL, map[string]any{}))
+	fs := &saveFailingStore{memStore: ms, failWrites: 1}
+	e := deliveryEngine(ms)
+	e.store = fs
+
+	if _, err := e.ProcessNotificationDeliveries(context.Background()); err == nil {
+		t.Fatal("first cycle: want the save error")
+	}
+	if got := ms.row("notifications", "n1")["status"]; got != "delivering" {
+		t.Fatalf("after the failed save: status %v, want delivering", got)
+	}
+	out, err := e.ProcessNotificationDeliveries(context.Background())
+	if err != nil {
+		t.Fatalf("second cycle: %v", err)
+	}
+	if got := ms.row("notifications", "n1")["status"]; got != model.NotificationDelivered {
+		t.Errorf("after the next cycle: status %v, want delivered", got)
+	}
+	if len(out) != 1 {
+		t.Errorf("second cycle reported %d delivered, want the 1 it saved", len(out))
+	}
+	if hits != 1 {
+		t.Errorf("provider called %d times, want 1 — the page must not be sent again", hits)
 	}
 }

@@ -174,25 +174,51 @@ func (e *Engine) ProcessNotificationBatches(ctx context.Context) ([]map[string]a
 	return out.flushed, nil
 }
 
+// deliveryResult is one provider call of the delivery stage, kept until its
+// outcome is saved.
+type deliveryResult struct {
+	ntf            map[string]any
+	attempt        map[string]any
+	outcome        deliveryOutcome
+	finishedAt     string
+	shortCircuited bool
+}
+
+// retryResult is deliveryResult for the retry stage.
+type retryResult struct {
+	ntf            map[string]any
+	attempt        map[string]any
+	outcome        deliveryOutcome
+	finishedAt     string
+	failedContext  bool
+	shortCircuited bool
+}
+
 func (e *Engine) ProcessNotificationDeliveries(ctx context.Context) ([]map[string]any, error) {
+	// Outcomes the last cycle could not save go first: the pages went out and
+	// the rows are still claimed by this worker, so saving them is all that is
+	// left. Claiming more work before that would leave them to the reaper —
+	// minutes later, and delivered a second time.
+	var saved []map[string]any
+	if len(e.unsavedDeliveries) > 0 {
+		out, err := e.saveDeliveryResults(ctx, e.unsavedDeliveries)
+		if err != nil {
+			return nil, err
+		}
+		e.unsavedDeliveries = nil
+		saved = out
+	}
 	// Atomically claim a batch: each row moves delivery_scheduled → 'delivering'
 	// and is handed to exactly one worker, so concurrent worker replicas never
 	// deliver the same notification twice.
 	deliverable, err := e.store.ClaimDeliverableNotifications(ctx, e.workerID, utils.ToISO(utils.UTCNow()))
 	if err != nil {
-		return nil, err
+		return saved, err
 	}
 	if len(deliverable) == 0 {
-		return nil, nil
+		return saved, nil
 	}
 
-	type deliveryResult struct {
-		ntf            map[string]any
-		attempt        map[string]any
-		outcome        deliveryOutcome
-		finishedAt     string
-		shortCircuited bool
-	}
 	// HTTP/SMTP/etc. delivery runs concurrently (bounded) — it is the slow part
 	// of the cycle and already happens outside the advisory lock. Rows are already
 	// claimed ('delivering'), so this loop owns them exclusively.
@@ -234,9 +260,19 @@ func (e *Engine) ProcessNotificationDeliveries(ctx context.Context) ([]map[strin
 	})
 
 	if len(results) == 0 {
-		return nil, nil
+		return saved, nil
 	}
+	processed, err := e.saveDeliveryResults(ctx, results)
+	if err != nil {
+		// Kept for the next cycle; see the top of this function.
+		e.unsavedDeliveries = results
+		return saved, err
+	}
+	return append(saved, processed...), nil
+}
 
+// saveDeliveryResults records the outcomes of one delivery batch.
+func (e *Engine) saveDeliveryResults(ctx context.Context, results []deliveryResult) ([]map[string]any, error) {
 	ntfIDs := make([]any, 0, len(results))
 	for _, r := range results {
 		ntfIDs = append(ntfIDs, model.WrapNotification(r.ntf).ID())
@@ -268,7 +304,9 @@ func (e *Engine) ProcessNotificationDeliveries(ctx context.Context) ([]map[strin
 					continue
 				}
 				n := model.WrapNotification(cur)
-				if !n.IsDelivering() {
+				// Still ours: an outcome saved a cycle late must not overwrite a
+				// claim the reaper has since handed to another worker.
+				if !n.IsDelivering() || utils.StrVal(cur, "claimed_by") != e.workerID {
 					continue
 				}
 				if r.shortCircuited {
@@ -413,14 +451,24 @@ func (e *Engine) recordDeliveryFailures(ctx context.Context, failed []model.Noti
 
 func (e *Engine) ProcessNotificationRetries(ctx context.Context) ([]map[string]any, error) {
 	ts := utils.ToISO(utils.UTCNow())
+	// As in ProcessNotificationDeliveries: save what the last cycle could not.
+	var saved []map[string]any
+	if len(e.unsavedRetries) > 0 {
+		out, err := e.saveRetryResults(ctx, e.unsavedRetries)
+		if err != nil {
+			return nil, err
+		}
+		e.unsavedRetries = nil
+		saved = out
+	}
 	// Atomically claim due retries (retry_scheduled → 'retrying') so each is
 	// retried by exactly one worker.
 	dueNotifs, err := e.store.ClaimRetryableNotifications(ctx, e.workerID, ts)
 	if err != nil {
-		return nil, err
+		return saved, err
 	}
 	if len(dueNotifs) == 0 {
-		return nil, nil
+		return saved, nil
 	}
 
 	// Rebuild missing payloads outside lock, fetching only the groups and
@@ -454,14 +502,6 @@ func (e *Engine) ProcessNotificationRetries(ctx context.Context) ([]map[string]a
 		}
 	}
 
-	type retryResult struct {
-		ntf            map[string]any
-		attempt        map[string]any
-		outcome        deliveryOutcome
-		finishedAt     string
-		failedContext  bool
-		shortCircuited bool
-	}
 	// ctx2Map is read-only from here on, so the retry deliveries run concurrently
 	// (bounded), like ProcessNotificationDeliveries. Rows are already claimed
 	// ('retrying'), so this loop owns them exclusively.
@@ -514,9 +554,18 @@ func (e *Engine) ProcessNotificationRetries(ctx context.Context) ([]map[string]a
 	})
 
 	if len(results) == 0 {
-		return nil, nil
+		return saved, nil
 	}
+	retried, err := e.saveRetryResults(ctx, results)
+	if err != nil {
+		e.unsavedRetries = results
+		return saved, err
+	}
+	return append(saved, retried...), nil
+}
 
+// saveRetryResults records the outcomes of one retry batch.
+func (e *Engine) saveRetryResults(ctx context.Context, results []retryResult) ([]map[string]any, error) {
 	retryIDs := make([]any, 0, len(results))
 	for _, r := range results {
 		retryIDs = append(retryIDs, model.WrapNotification(r.ntf).ID())
@@ -540,7 +589,7 @@ func (e *Engine) ProcessNotificationRetries(ctx context.Context) ([]map[string]a
 					continue
 				}
 				n := model.WrapNotification(cur)
-				if !n.IsRetrying() {
+				if !n.IsRetrying() || utils.StrVal(cur, "claimed_by") != e.workerID {
 					continue
 				}
 				if r.shortCircuited {
