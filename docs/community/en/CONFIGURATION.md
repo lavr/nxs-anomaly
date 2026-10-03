@@ -631,6 +631,38 @@ ALERT_PROCESSING.md §5.3). `NXS_ANOMALY_CHATOPS_STATUS_UPDATES=false` turns the
 messages off; they are independent of `NXS_ANOMALY_NOTIFY_ON_RESOLVE`, which tells
 *people* that an alert is over.
 
+**Editing the alert instead of adding a line.** An incoming webhook cannot edit
+what it posted, so by default a status change is a new message under the alert. A
+channel posted to through a chat API (or a gateway in front of one) that returns
+the created message's id and accepts edits by it can be told how to edit:
+
+```bash
+api -X PUT "$API/api/v1/chatops/channels/chat_..." -d '{
+  "message_update": {
+    "method": "PUT",
+    "url": "https://chat.example.com/api/messages/{message_id}",
+    "message_id_path": "result.id"
+  }
+}'
+```
+
+- When the alert is posted, the id is read from the JSON response at
+  `message_id_path` (dotted, array indexes allowed: `id`, `result.message_id`,
+  `messages.0.id`; default `id`) and kept on the alert's notification.
+- On acknowledge, unacknowledge and resolve the worker sends `method` (`POST`,
+  `PUT` or `PATCH`; default `PATCH`) to `url` with `{message_id}` replaced, with
+  the same body as the post plus the id: `{"text": "…", "message_id": "…"}`. The
+  text is the alert rendered again with its new status (`reason`, `event`), from
+  the same template. Headers are the channel's `headers`.
+- The latest alert message of the group in that channel is the one edited. With no
+  id for it (posted before this was configured, the response had none, or the alert
+  failed), or when the platform answers the edit with a 4xx, the status is posted as
+  a new message; a 5xx or a timeout is retried like any delivery. If the alert
+  itself is still being delivered, the edit waits for it for up to the retry
+  budget, then posts a new message.
+- `url` may be an `env:` reference and is masked like `webhook_url`; `null` or `{}`
+  removes the setting. A `telegram` channel goes through the bot and ignores it.
+
 For inbound commands (acknowledging an alert straight from the chat) configure a
 signature: `NXS_ANOMALY_SLACK_SIGNING_SECRET`,
 `NXS_ANOMALY_TELEGRAM_WEBHOOK_SECRET` or

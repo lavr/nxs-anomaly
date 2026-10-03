@@ -2832,6 +2832,35 @@
             "type": "string",
             "description": "Channel id on the platform itself (Slack channel id, Telegram chat id); inbound commands name this, not the internal id."
           },
+          "message_update": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "How to edit a message posted through webhook_url, so that acknowledge, unacknowledge and resolve rewrite the alert's message instead of posting a new one. The id of the posted message is read from the response to the post at message_id_path; the edit is a request with method to url, where {message_id} is replaced by that id, with the post's JSON body plus \"message_id\". Without it, without an id, or when the platform refuses the edit with a 4xx, the status is posted as a new message. Ignored for the telegram platform. null or {} removes it. url may be an env: reference and is masked for readers who may not edit configuration.",
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": [
+                  "POST",
+                  "PUT",
+                  "PATCH"
+                ],
+                "description": "Defaults to PATCH."
+              },
+              "url": {
+                "type": "string",
+                "description": "Edit endpoint, e.g. https://chat.example.com/api/messages/{message_id}."
+              },
+              "message_id_path": {
+                "type": "string",
+                "description": "Dotted JSON path of the message id in the post's response, e.g. id, result.message_id, messages.0.id. Defaults to id."
+              }
+            },
+            "required": [
+              "url"
+            ]
+          },
           "notifications_enabled": {
             "type": "boolean"
           },
