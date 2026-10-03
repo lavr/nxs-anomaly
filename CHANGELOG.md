@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## Unreleased
+
+### Added
+- **ChatOps channels read integration templates.** A channel posted to through
+  its `webhook_url` takes `templates.chatops`, then the key named after its
+  `platform` (`slack`, `mattermost`, …), then `default`; a Telegram ChatOps
+  channel reads `chatops` before `telegram`. Without a template the text is the
+  built-in one, as before.
+- **Links in notification templates.** Every template can use `group_url` (the
+  group's page, from `NXS_ANOMALY_PUBLIC_URL`) and the source's links
+  `generator_url`, `dashboard_url`, `panel_url`, `silence_url`, which are now
+  carried from the alert to its group. All five are empty strings when unknown.
+  The built-in ChatOps text ends with the group's page when
+  `NXS_ANOMALY_PUBLIC_URL` is set.
+
 ## [1.9.16] — 2026-10-03
 
 ### Fixed

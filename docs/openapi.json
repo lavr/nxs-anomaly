@@ -4430,7 +4430,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Notification text templates keyed by channel name (telegram, email, webhook, sms, phone); the \"default\" key applies to channels without their own template. Variables: title, severity, reason, group_id, status, user_name, user_username — written as {{ .title }}, {{ title }} or the CamelCase aliases {{ .Title }}, {{ .GroupID }}. An empty object clears all templates and restores the built-in format."
+            "description": "Notification text templates keyed by channel name (telegram, email, chatops, or a ChatOps channel's platform such as slack); the \"default\" key applies to channels without their own template. A ChatOps channel reads chatops, then its platform, then default. Variables: title, severity, reason, group_id, status, user_name, user_username, group_url, generator_url, dashboard_url, panel_url, silence_url (links are empty strings when unknown), labels, label_<name> — written as {{ .title }}, {{ title }} or the CamelCase aliases {{ .Title }}, {{ .GroupID }}. An empty object clears all templates and restores the built-in format."
           },
           "team_id": {
             "type": [
