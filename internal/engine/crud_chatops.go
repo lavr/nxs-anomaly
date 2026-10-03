@@ -75,8 +75,12 @@ func (e *Engine) CreateChatopsChannel(ctx context.Context, payload map[string]an
 				// naming this, not our internal id.
 				"external_id":           utils.StrVal(payload, "external_id"),
 				"notifications_enabled": utils.BoolVal(payload, "notifications_enabled", true),
-				"created_at":            ts,
-				"updated_at":            ts,
+				// Post Slack and Mattermost alerts with their buttons, as
+				// personal notifications have them. Off unless asked for: see
+				// chatopsAlertBody.
+				"interactive": utils.BoolVal(payload, "interactive", false),
+				"created_at":  ts,
+				"updated_at":  ts,
 			}
 			stampProvisioner(ctx, channel)
 			state.ChatopsChannels[channel["id"].(string)] = channel
@@ -164,6 +168,9 @@ func (e *Engine) UpdateChatopsChannel(ctx context.Context, channelID string, pay
 			}
 			if v, ok := payload["commands_enabled"]; ok {
 				channel["commands_enabled"] = utils.BoolVal(map[string]any{"v": v}, "v", true)
+			}
+			if v, ok := payload["interactive"]; ok {
+				channel["interactive"] = utils.BoolVal(map[string]any{"v": v}, "v", false)
 			}
 			if teamIDSet {
 				channel["team_id"] = teamID

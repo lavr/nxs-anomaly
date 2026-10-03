@@ -322,16 +322,18 @@ func (e *Engine) deliverChatops(ctx context.Context, ntf map[string]any, channel
 	// template written for Slack elsewhere; then default.
 	tmpl := e.getNotificationTemplate(ctx, utils.StrVal(payload, "integration_id"), "chatops", platform)
 	text := renderNotificationText(ntf, payload, tmpl)
-	if tmpl == "" {
+	isStatus := utils.StrVal(payload, "chatops_event") != ""
+	body, linked := e.chatopsAlertBody(channel, payload, text, isStatus)
+	if tmpl == "" && !linked {
 		// A channel is where several people read the same alert, and the one
 		// who takes it needs the page with its timeline and buttons. Only on
 		// the built-in text: a template decides for itself, via group_url.
 		if url := utils.StrVal(payload, "group_url"); url != "" {
 			text += "\n" + url
+			body["text"] = text
 		}
 	}
 	update := chatopsMessageUpdateOf(channel)
-	isStatus := utils.StrVal(payload, "chatops_event") != ""
 	if update != nil && isStatus {
 		if res, done := e.updateChatopsMessage(ctx, ntf, channel, payload, update, text, headers); done {
 			return res
@@ -344,11 +346,11 @@ func (e *Engine) deliverChatops(ctx context.Context, ntf map[string]any, channel
 		keepBody = maxMessageIDBody
 	}
 	proxyChannel := e.deliveryCfg.chatopsProxyChannel(platform)
-	res, body := sendJSONGuarded(ctx, e.deliveryCfg.clientFor(proxyChannel), http.MethodPost, webhookURL,
-		map[string]any{"text": text}, e.deliveryCfg.ssrfGuardFor(proxyChannel), headers, keepBody)
+	res, respBody := sendJSONGuarded(ctx, e.deliveryCfg.clientFor(proxyChannel), http.MethodPost, webhookURL,
+		body, e.deliveryCfg.ssrfGuardFor(proxyChannel), headers, keepBody)
 	res.ProviderStatus = platform + "_chatops"
 	if keepBody > 0 && res.Status == deliveryDelivered {
-		if res.MessageID = messageIDAt(body, update.MessageIDPath); res.MessageID == "" {
+		if res.MessageID = messageIDAt(respBody, update.MessageIDPath); res.MessageID == "" {
 			// Delivered all the same; only the later edit is lost, and its
 			// status message will be posted as a new one instead.
 			slog.Warn("chatops_message_id_not_found",
@@ -357,6 +359,36 @@ func (e *Engine) deliverChatops(ctx context.Context, ntf map[string]any, channel
 		}
 	}
 	return res
+}
+
+// chatopsAlertBody is what a webhook-backed channel is posted: the text alone,
+// or — for a Slack or Mattermost channel marked interactive — the same message
+// with the buttons a personal Slack or Mattermost notification carries. linked
+// reports that the body already links to the group's page, so the built-in
+// text need not add the address as a line of its own.
+//
+// Opt-in per channel, unlike the personal targets: a channel's webhook_url
+// may be any gateway that happens to be labelled slack, and a channel that
+// received plain text yesterday must not start receiving blocks on upgrade.
+// Taps come back through the existing inbound endpoints, which find the
+// channel by external_id, so the channel's team bounds what a tap may do.
+// A status message never carries buttons: they belong under the alert.
+func (e *Engine) chatopsAlertBody(channel, payload map[string]any, text string, isStatus bool) (body map[string]any, linked bool) {
+	groupID := utils.StrVal(payload, "alert_group_id")
+	if isStatus || groupID == "" || !utils.BoolVal(channel, "interactive", false) {
+		return map[string]any{"text": text}, false
+	}
+	publicURL := e.deliveryCfg.PublicURL
+	switch strings.ToLower(utils.StrVal(channel, "platform")) {
+	case "slack":
+		return SlackMessagePayload(text, groupID, publicURL), publicURL != ""
+	case "mattermost":
+		secret := e.deliveryCfg.MattermostActionSecret
+		// Without the secret MattermostMessagePayload sends the text alone,
+		// and the link it would have put in the attachment goes with it.
+		return MattermostMessagePayload(text, groupID, publicURL, secret), publicURL != "" && secret != ""
+	}
+	return map[string]any{"text": text}, false
 }
 
 // templateCacheEntry is a cached template plus the time it was read. The
