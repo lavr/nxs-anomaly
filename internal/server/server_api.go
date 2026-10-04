@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -552,9 +553,21 @@ func (srv *Server) verifyWebhookSig(r *http.Request, integrationKey string, rawB
 		return nil
 	}
 	rawSecret, _ := integration["webhook_secret"].(string)
+	if rawSecret == "" {
+		return nil // this integration does not require a signature
+	}
 	secret := utils.ResolveSecretRef(rawSecret)
 	if secret == "" {
-		return nil
+		// A signature is required and this process cannot check it: the env
+		// variable the reference names is missing or empty here. That used to
+		// read as "no secret configured" and let unsigned requests in — on this
+		// replica only, if the others had the variable. Refused instead; the
+		// reference names a variable, not a value, so it is safe to log.
+		slog.Error("webhook_secret_unresolved",
+			"integration_id", utils.StrVal(integration, "id"),
+			"secret_ref", rawSecret,
+			"fix", "set the environment variable the integration's webhook_secret names")
+		return errWebhookSecretUnresolved
 	}
 	sigHeader := r.Header.Get("X-Hub-Signature-256")
 	if sigHeader == "" {

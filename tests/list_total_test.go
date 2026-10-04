@@ -69,6 +69,26 @@ func TestListTotalCountsExactlyThenEstimates(t *testing.T) {
 	if page["total"].(int) != 7 || page["total_estimated"] != nil {
 		t.Errorf("under the cap: total=%v estimated=%v, want exactly 7 and no flag", page["total"], page["total_estimated"])
 	}
+	if page["total"].(int) > store.ListTotalCap || page["total_lower_bound"] != nil {
+		t.Errorf("under the cap: total_lower_bound=%v, want no flag", page["total_lower_bound"])
+	}
+
+	// Rows the statistics have not seen: the planner guesses a handful, the
+	// count stops at the cap, and the total is a lower bound, not an estimate
+	// of 10 001.
+	late, err := eng.CreateIntegration(adminCtx, map[string]any{"name": "cap-late"})
+	if err != nil {
+		t.Fatalf("create integration: %v", err)
+	}
+	insert(late, store.ListTotalCap+500, "alt_caplate_")
+	page, err = eng.ListCollectionPage(adminCtx, "alerts", map[string]any{"limit": 10, "integration_id": utils.StrVal(late, "id")})
+	if err != nil {
+		t.Fatalf("list late: %v", err)
+	}
+	if page["total"].(int) != store.ListTotalCap+1 || page["total_estimated"] != true || page["total_lower_bound"] != true {
+		t.Errorf("planner underestimates: total=%v estimated=%v lower_bound=%v, want %d, true, true",
+			page["total"], page["total_estimated"], page["total_lower_bound"], store.ListTotalCap+1)
+	}
 }
 
 // TestChatopsStatusHidesGroupsOfADeletedOtherTeamIntegration: status reads

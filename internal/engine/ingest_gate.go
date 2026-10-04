@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 )
 
 // ErrIngestBusy is returned when an integration already has as many ingests
@@ -27,6 +28,18 @@ const ingestGateMaxWaiting = 128
 // leave the pool to everything else.
 const ingestGateHolders = 2
 
+// ingestGateMaxWait is how long an ingest may wait for its turn before it is
+// told to come back (ErrIngestBusy, 503 + Retry-After).
+//
+// The count bound above was sized for single alerts. An Alertmanager envelope
+// carries up to a hundred, and the same 128 waiters were then a minute of
+// work: under load its POSTs waited 18–30 s, and past the 30 s HTTP write
+// timeout the server dropped the answer to an envelope it went on to store in
+// full — the sender saw a failure and sent it again. Bounding the wait in time
+// keeps every answer well inside the write timeout, whatever a request
+// carries.
+const ingestGateMaxWait = 10 * time.Second
+
 // ingestGate lets ingestGateHolders ingests per integration go to the database
 // at a time in this process; the others wait here, holding no connection.
 //
@@ -44,8 +57,9 @@ const ingestGateHolders = 2
 // stays the guarantee. It only decides how many connections each replica
 // spends on waiting for it: at most ingestGateHolders per integration.
 type ingestGate struct {
-	mu    sync.Mutex
-	slots map[string]*ingestSlot
+	mu      sync.Mutex
+	slots   map[string]*ingestSlot
+	maxWait time.Duration
 }
 
 type ingestSlot struct {
@@ -54,11 +68,12 @@ type ingestSlot struct {
 }
 
 func newIngestGate() *ingestGate {
-	return &ingestGate{slots: map[string]*ingestSlot{}}
+	return &ingestGate{slots: map[string]*ingestSlot{}, maxWait: ingestGateMaxWait}
 }
 
 // enter waits for the slot of key and returns its release, or ErrIngestBusy at
-// once when the queue is full, or the context's error if the caller gives up.
+// once when the queue is full or after maxWait without a turn, or the
+// context's error if the caller gives up.
 func (g *ingestGate) enter(ctx context.Context, key string) (func(), error) {
 	g.mu.Lock()
 	s := g.slots[key]
@@ -76,12 +91,17 @@ func (g *ingestGate) enter(ctx context.Context, key string) (func(), error) {
 	s.users++
 	g.mu.Unlock()
 
+	timer := time.NewTimer(g.maxWait)
+	defer timer.Stop()
 	select {
 	case <-s.tokens:
 		return func() {
 			s.tokens <- struct{}{}
 			g.leave(key, s)
 		}, nil
+	case <-timer.C:
+		g.leave(key, s)
+		return nil, ErrIngestBusy
 	case <-ctx.Done():
 		g.leave(key, s)
 		return nil, ctx.Err()

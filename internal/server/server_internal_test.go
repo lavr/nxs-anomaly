@@ -1,7 +1,10 @@
 package server
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -69,6 +72,30 @@ func TestWriteEngineErrorMapsStatus(t *testing.T) {
 				t.Errorf("internal error leaked details: %s", w.Body.String())
 			}
 		})
+	}
+}
+
+// A client that hung up is not an engine failure: no ERROR line, no 500. A real
+// timeout still is.
+func TestWriteEngineErrorClientGone(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	defer slog.SetDefault(prev)
+
+	w := httptest.NewRecorder()
+	writeEngineError(w, fmt.Errorf("list groups: %w", context.Canceled))
+	if w.Code != statusClientClosedRequest {
+		t.Fatalf("code = %d, want %d", w.Code, statusClientClosedRequest)
+	}
+	if strings.Contains(buf.String(), "engine error") {
+		t.Fatalf("a canceled request was logged as an engine error: %s", buf.String())
+	}
+
+	w = httptest.NewRecorder()
+	writeEngineError(w, fmt.Errorf("list groups: %w", context.DeadlineExceeded))
+	if w.Code != http.StatusInternalServerError || !strings.Contains(buf.String(), "engine error") {
+		t.Fatalf("a timeout must stay an engine error: code=%d log=%s", w.Code, buf.String())
 	}
 }
 

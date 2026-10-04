@@ -37,24 +37,24 @@ type InsightsBucket struct {
 	Failed    int    `json:"failed"`
 }
 
-// severityLevelSQL maps the stored spelling to its level inside SQL, so a
-// GROUP BY counts "high" and "error" as one thing. Built from severityAliases
-// for the same reason severityRankSQL is: one table, no second place to forget.
-func severityLevelSQL(column string) string {
-	levels := make([]string, 0, len(severityAliases))
-	for level := range severityAliases {
-		levels = append(levels, level)
-	}
-	sort.Strings(levels)
-	var b strings.Builder
-	b.WriteString("CASE lower(" + column + ")")
-	for _, level := range levels {
-		for _, alias := range severityAliases[level] {
-			fmt.Fprintf(&b, " WHEN '%s' THEN '%s'", alias, level)
+// severityLevel maps a stored spelling to its level, so "high" and "error" are
+// one bar. Built from severityAliases for the same reason severityRankSQL is:
+// one table, no second place to forget.
+//
+// It runs in Go on the grouped rows, not in SQL on every row: the database
+// groups by the raw spelling (a few dozen combinations), and lower() plus a
+// thirty-branch CASE per group row cost more than the whole index read they
+// were attached to.
+func severityLevel(severity string) string {
+	s := strings.ToLower(severity)
+	for level, aliases := range severityAliases {
+		for _, alias := range aliases {
+			if s == alias {
+				return level
+			}
 		}
 	}
-	b.WriteString(" ELSE 'unknown' END")
-	return b.String()
+	return "unknown"
 }
 
 // InsightsSummaryQuery gathers the whole insights screen in three statements.
@@ -76,21 +76,24 @@ func (s *pgStore) InsightsSummaryQuery(ctx context.Context, integrationID string
 		groupWhere = " WHERE " + where
 	}
 
+	// Answered from nxs_anomaly_alert_groups_insights_idx alone (migration
+	// 0036): status and severity ride along in the index, so the count never
+	// reads the wide rows themselves.
 	rows, err := s.pool.Query(ctx,
-		"SELECT status, "+severityLevelSQL("severity")+" AS level, COUNT(*) "+
+		"SELECT COALESCE(status, ''), COALESCE(severity, ''), COUNT(*) "+
 			"FROM nxs_anomaly_alert_groups"+groupWhere+" GROUP BY 1, 2", args...)
 	if err != nil {
 		return out, err
 	}
 	for rows.Next() {
-		var status, level string
+		var status, severity string
 		var n int
-		if err := rows.Scan(&status, &level, &n); err != nil {
+		if err := rows.Scan(&status, &severity, &n); err != nil {
 			rows.Close()
 			return out, err
 		}
 		out.GroupsByStatus[status] += n
-		out.GroupsByLevel[level] += n
+		out.GroupsByLevel[severityLevel(severity)] += n
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -174,11 +177,13 @@ func (s *pgStore) insightsTrend(ctx context.Context, integrationID string, integ
 
 	gWhere, gArgs := insightsScope(integrationID, integrationIDs, "created_at >= $$FROM$$ AND created_at <= $$TO$$")
 	gWhere, gArgs = bindRange(gWhere, gArgs, from, to)
+	// to_char runs once per day, after the grouping, rather than once per group
+	// in range: on a busy week that was most of the statement's time.
 	rows, err := s.pool.Query(ctx,
-		"SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day, "+
-			"COUNT(*) AS opened, "+
+		"SELECT to_char(day, 'YYYY-MM-DD'), COUNT(*) AS opened, "+
 			"COUNT(*) FILTER (WHERE status = 'resolved') AS resolved "+
-			"FROM nxs_anomaly_alert_groups WHERE "+gWhere+" GROUP BY 1", gArgs...)
+			"FROM (SELECT date_trunc('day', created_at AT TIME ZONE 'UTC') AS day, status "+
+			"FROM nxs_anomaly_alert_groups WHERE "+gWhere+") g GROUP BY day", gArgs...)
 	if err != nil {
 		return nil, err
 	}

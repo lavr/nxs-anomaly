@@ -70,8 +70,11 @@ func TestVerifyWebhookSig(t *testing.T) {
 		integration map[string]any
 		storeErr    error
 		sigHeader   string
+		env         map[string]string
 		wantSigErr  bool // true → expect errWebhookSigInvalid
 		wantAnyErr  bool // true → expect any non-nil error
+		// true → expect errWebhookSecretUnresolved
+		wantUnresolved bool
 	}{
 		{
 			name:        "no integration",
@@ -113,10 +116,39 @@ func TestVerifyWebhookSig(t *testing.T) {
 			storeErr:   fmt.Errorf("db unavailable"),
 			wantAnyErr: true,
 		},
+		{
+			name:        "env secret present, valid signature",
+			integration: map[string]any{"id": "int-1", "webhook_secret": "env:NXS_TEST_WEBHOOK_SECRET"},
+			env:         map[string]string{"NXS_TEST_WEBHOOK_SECRET": secret},
+			sigHeader:   validSig,
+		},
+		{
+			name:        "env secret present, unsigned request",
+			integration: map[string]any{"id": "int-1", "webhook_secret": "env:NXS_TEST_WEBHOOK_SECRET"},
+			env:         map[string]string{"NXS_TEST_WEBHOOK_SECRET": secret},
+			wantSigErr:  true,
+		},
+		{
+			// A signature is required and the variable is missing on this
+			// instance: unsigned requests used to be let in.
+			name:           "env secret missing",
+			integration:    map[string]any{"id": "int-1", "webhook_secret": "env:NXS_TEST_WEBHOOK_SECRET_UNSET"},
+			wantUnresolved: true,
+		},
+		{
+			name:           "env secret empty",
+			integration:    map[string]any{"id": "int-1", "webhook_secret": "env:NXS_TEST_WEBHOOK_SECRET"},
+			env:            map[string]string{"NXS_TEST_WEBHOOK_SECRET": ""},
+			sigHeader:      validSig,
+			wantUnresolved: true,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
 			srv := &Server{
 				store: &stubStore{
 					findIntegration: func(_ context.Context, _ string) (map[string]any, error) {
@@ -130,6 +162,10 @@ func TestVerifyWebhookSig(t *testing.T) {
 			}
 			err := srv.verifyWebhookSig(r, "some-key", raw)
 			switch {
+			case tc.wantUnresolved:
+				if err != errWebhookSecretUnresolved {
+					t.Fatalf("expected errWebhookSecretUnresolved, got %v", err)
+				}
 			case tc.wantSigErr:
 				if err != errWebhookSigInvalid {
 					t.Fatalf("expected errWebhookSigInvalid, got %v", err)
@@ -360,6 +396,12 @@ func TestRequiredAction(t *testing.T) {
 		{http.MethodGet, "/api/v1/readiness", authz.ActionRead},
 		{http.MethodPost, "/api/v1/readiness/acknowledge", authz.ActionAdmin},
 		{http.MethodPost, "/api/v1/backups/report", authz.ActionAdmin},
+		// Issuing a device or a session takes any user_id: credentials for
+		// somebody else. Pairing one's own phone stays a read-floor action.
+		{http.MethodPost, "/api/v1/mobile/devices", authz.ActionAdmin},
+		{http.MethodPost, "/api/v1/mobile/sessions", authz.ActionAdmin},
+		{http.MethodGet, "/api/v1/mobile/sessions", authz.ActionRead},
+		{http.MethodPost, "/api/v1/mobile/pairing", authz.ActionRead},
 		// An unknown write must not fall through to something a viewer can do.
 		{http.MethodPost, "/api/v1/brand-new-thing", authz.ActionEdit},
 	}

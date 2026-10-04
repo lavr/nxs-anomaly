@@ -106,3 +106,38 @@ func TestIngestGateCancelledWaiterLeaves(t *testing.T) {
 		t.Fatalf("slots left = %d, want 0", n)
 	}
 }
+
+// A turn that does not come within maxWait is a refusal, not a longer wait: a
+// waiter that outlives the HTTP write timeout loses its answer, while the
+// ingest it was queued for still runs and the sender sends it again.
+func TestIngestGateRefusesAfterMaxWait(t *testing.T) {
+	g := newIngestGate()
+	g.maxWait = 50 * time.Millisecond
+	var releases []func()
+	for range ingestGateHolders {
+		r, err := g.enter(context.Background(), "k1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		releases = append(releases, r)
+	}
+	t0 := time.Now()
+	if _, err := g.enter(context.Background(), "k1"); !errors.Is(err, ErrIngestBusy) {
+		t.Fatalf("enter with every holder busy past maxWait = %v, want ErrIngestBusy", err)
+	}
+	if waited := time.Since(t0); waited > time.Second {
+		t.Fatalf("waited %v, want about maxWait", waited)
+	}
+	for _, r := range releases {
+		r()
+	}
+	g.mu.Lock()
+	n := len(g.slots)
+	g.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("slots left = %d, want 0: the refused waiter must leave", n)
+	}
+	if ingestGateMaxWait >= 30*time.Second {
+		t.Fatalf("ingestGateMaxWait = %v must stay well under the 30 s HTTP write timeout", ingestGateMaxWait)
+	}
+}
