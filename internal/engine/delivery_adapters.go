@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -94,10 +95,9 @@ func checkWebhookURL(ctx context.Context, rawURL string, guard ssrfGuard) error 
 	if guard.mode == modeProxied {
 		return guardProxiedHost(ctx, host, guard)
 	}
-	var resolver net.Resolver
-	ips, err := resolver.LookupIPAddr(ctx, host)
+	ips, err := preflightLookup(ctx, host)
 	if err != nil {
-		return fmt.Errorf("resolve webhook host %q: %w", host, err)
+		return &unresolvedHostError{host: host, err: err}
 	}
 	for _, ip := range ips {
 		if guard.blocks(host, ip.IP) {
@@ -105,6 +105,33 @@ func checkWebhookURL(ctx context.Context, rawURL string, guard ssrfGuard) error 
 		}
 	}
 	return nil
+}
+
+// preflightLookup resolves a destination for the direct pre-flight. A variable
+// so tests can make the resolver fail and then recover.
+var preflightLookup = (&net.Resolver{}).LookupIPAddr
+
+// unresolvedHostError is a pre-flight that reached no verdict: the name did not
+// resolve, so there was no address to judge. Every other pre-flight error is a
+// verdict about the destination itself. The two must not share an outcome — a
+// resolver outage of a few seconds used to mark the notification skipped as a
+// blocked destination, terminally, so the page was never sent.
+type unresolvedHostError struct {
+	host string
+	err  error
+}
+
+func (e *unresolvedHostError) Error() string {
+	return fmt.Sprintf("resolve webhook host %q: %v", e.host, e.err)
+}
+
+func (e *unresolvedHostError) Unwrap() error { return e.err }
+
+// isUnresolvedHost reports whether a pre-flight error is a failed lookup
+// rather than a refusal.
+func isUnresolvedHost(err error) bool {
+	var u *unresolvedHostError
+	return errors.As(err, &u)
 }
 
 // guardProxiedHost is the pre-flight for a destination a proxy will reach.
@@ -297,6 +324,12 @@ func postWebhook(ctx context.Context, client *http.Client, url string, payload m
 // return. The SSRF pre-flight is the one chosen for the channel (ssrfGuardFor).
 func postWebhookGuarded(ctx context.Context, client *http.Client, url string, payload map[string]any, guard ssrfGuard, headers map[string]string) deliveryOutcome {
 	if err := checkWebhookURL(ctx, url, guard); err != nil {
+		// A failed lookup is not a verdict: DNS that answers on the next
+		// attempt makes the destination deliverable, so it is retried like any
+		// other transport failure, and dead-letters if it never recovers.
+		if isUnresolvedHost(err) {
+			return failed("dns_lookup", err.Error(), 0, "")
+		}
 		// Terminal, like a refusal by the channel policy: the destination does
 		// not change between attempts, so retrying it twice only delays the
 		// moment the reason reaches the timeline.
@@ -935,7 +968,7 @@ func buildEmailMessage(from, recipient, subject, body string, now time.Time, hos
 	return b.Bytes()
 }
 
-func sendEmail(recipient, subject, text string, cfg SMTPConfig) (status, errMsg, providerResp string) {
+func sendEmail(ctx context.Context, recipient, subject, text string, cfg SMTPConfig) (status, errMsg, providerResp string) {
 	if cfg.Host == "" {
 		return "failed", "NXS_ANOMALY_SMTP_HOST is not set", ""
 	}
@@ -963,62 +996,38 @@ func sendEmail(recipient, subject, text string, cfg SMTPConfig) (status, errMsg,
 		auth = smtp.PlainAuth("", username, password, host)
 	}
 
-	// Without a proxy this is the historical path verbatim: tls.Dial or
-	// smtp.SendMail. With a SOCKS5 proxy configured for the email channel the TCP
-	// connection has to come from the proxy dialler, so TLS is layered on top of
-	// it by hand and the plain path drives the client directly.
-	if cfg.Dial != nil {
-		return sendEmailVia(cfg.Dial, addr, host, sender, recipient, msg, auth, useTLS)
+	// One path for direct and proxied delivery. The direct one used to be
+	// tls.Dial or smtp.SendMail, and neither takes a context or a deadline: a
+	// server that accepted the connection and never answered held the delivery
+	// goroutine — and with it the whole delivery stage and every later worker
+	// cycle — forever. With a SOCKS5 proxy or a tcp relay configured for the
+	// email channel the TCP connection comes from that dialler instead.
+	dial := cfg.Dial
+	if dial == nil {
+		dialer := &net.Dialer{Timeout: cfg.Timeout}
+		dial = func(network, addr string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, addr)
+		}
 	}
-
-	var sendErr error
-	if useTLS {
-		tlsConf := &tls.Config{ServerName: host}
-		conn, err := tls.Dial("tcp", addr, tlsConf)
-		if err != nil {
-			return "failed", err.Error(), ""
-		}
-		client, err := smtp.NewClient(conn, host)
-		if err != nil {
-			return "failed", err.Error(), ""
-		}
-		defer client.Close() //nolint:errcheck
-		if auth != nil {
-			if err := client.Auth(auth); err != nil {
-				return "failed", err.Error(), ""
-			}
-		}
-		if err := client.Mail(sender); err != nil {
-			return "failed", err.Error(), ""
-		}
-		if err := client.Rcpt(recipient); err != nil {
-			return "failed", err.Error(), ""
-		}
-		w, err := client.Data()
-		if err != nil {
-			return "failed", err.Error(), ""
-		}
-		if _, sendErr = w.Write(msg); sendErr == nil {
-			sendErr = w.Close()
-		}
-	} else {
-		sendErr = smtp.SendMail(addr, auth, sender, []string{recipient}, msg)
-	}
-	if sendErr != nil {
-		return "failed", sendErr.Error(), ""
-	}
-	return "delivered", "", "smtp"
+	return sendEmailVia(ctx, dial, cfg.Timeout, addr, host, sender, recipient, msg, auth, useTLS)
 }
 
-// sendEmailVia sends one message over a connection the given dialler produced —
-// the SOCKS5 path. It mirrors what net/smtp does for us on the direct path,
-// including opportunistic STARTTLS on the plain port: dropping that would make
-// proxying an SMTP server quietly downgrade the connection.
-func sendEmailVia(dial func(network, addr string) (net.Conn, error), addr, host, sender, recipient string, msg []byte, auth smtp.Auth, useTLS bool) (status, errMsg, providerResp string) {
+// sendEmailVia sends one message over a connection the given dialler produced.
+// It mirrors what smtp.SendMail does, including opportunistic STARTTLS on the
+// plain port: dropping that would quietly downgrade the connection.
+//
+// The whole exchange — TLS handshake, greeting, every command, DATA — runs
+// under one deadline of the delivery timeout, the same bound every HTTP
+// channel has, and a cancelled ctx ends it at once. net/smtp observes neither
+// on its own; the deadline on the connection is what it does observe.
+func sendEmailVia(ctx context.Context, dial func(network, addr string) (net.Conn, error), timeout time.Duration, addr, host, sender, recipient string, msg []byte, auth smtp.Auth, useTLS bool) (status, errMsg, providerResp string) {
 	conn, err := dial("tcp", addr)
 	if err != nil {
 		return "failed", err.Error(), ""
 	}
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+	stop := context.AfterFunc(ctx, func() { _ = conn.SetDeadline(time.Unix(1, 0)) })
+	defer stop()
 	if useTLS {
 		tlsConn := tls.Client(conn, &tls.Config{ServerName: host})
 		if err := tlsConn.Handshake(); err != nil {

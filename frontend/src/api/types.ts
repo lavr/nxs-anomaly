@@ -177,6 +177,8 @@ export interface Page<T> {
   offset: number;
   /** True when total is an estimate: listings count exactly up to 10 000 rows. */
   total_estimated?: boolean;
+  /** True when total (10 001) is only a lower bound: show "10 000+". */
+  total_lower_bound?: boolean;
 }
 
 /** One entry of GET /api/v1/history. Its collections are nullable: the engine

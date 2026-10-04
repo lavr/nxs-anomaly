@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "nxs-anomaly native API",
-    "version": "1.9.16",
+    "version": "1.9.17",
     "description": "The native /api/v1 contract for nxs-anomaly (API, worker, frontend). This is the authoritative contract; the Grafana-compatibility surface under /api/internal/v1 is a compatibility shim and is NOT part of this contract. The core payloads — user, team, schedule, escalation chain, integration, alert group, alert, notification, delivery attempt — are modelled field by field, with `required` reflecting exactly the keys the engine writes unconditionally; every one still allows additional properties because the underlying storage is JSONB. Remaining resources use the open `Entity` schema. Drift between this document and the router is gated by internal/server/openapi_contract_test.go, and the frontend compiles against types generated from this file (frontend/src/api/schema.d.ts).",
     "license": {
       "name": "Apache-2.0"
@@ -1396,6 +1396,7 @@
           "mobile"
         ],
         "summary": "Register a mobile device",
+        "description": "Registers a device for any user, so it is admin-only. A person signs their own phone in through /api/v1/mobile/pairing.",
         "requestBody": {
           "$ref": "#/components/requestBodies/Object"
         },
@@ -1442,6 +1443,7 @@
           "mobile"
         ],
         "summary": "Create a mobile session",
+        "description": "Issues a session for any user's device, so it is admin-only. A person signs their own phone in through /api/v1/mobile/pairing.",
         "requestBody": {
           "$ref": "#/components/requestBodies/Object"
         },
@@ -3301,6 +3303,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         },
         "additionalProperties": true
@@ -3332,6 +3338,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         },
         "additionalProperties": true
@@ -3363,6 +3373,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         },
         "description": "Pagination envelope returned by list endpoints whose item type is not modelled."
@@ -4823,6 +4837,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5299,6 +5317,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5329,6 +5351,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5359,6 +5385,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5441,6 +5471,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5471,6 +5505,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5501,6 +5539,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5531,6 +5573,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5561,6 +5607,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5591,6 +5641,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },
@@ -5754,6 +5808,10 @@
           "total_estimated": {
             "type": "boolean",
             "description": "Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows."
+          },
+          "total_lower_bound": {
+            "type": "boolean",
+            "description": "Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound (\"10 000+\")."
           }
         }
       },

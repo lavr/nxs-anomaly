@@ -309,8 +309,9 @@ func (s *pgStore) ListCollectionPage(ctx context.Context, collection string, fil
 }
 
 // ListTotalCap is how far a listing counts exactly. Beyond it the total is the
-// planner's estimate (never below ListTotalCap+1), and the API says so with
-// total_estimated: a page header reading "≈ 1 163 000 alerts" costs a
+// planner's estimate (never below ListTotalCap+1; exactly ListTotalCap+1, a
+// lower bound, when the planner guesses no more than the cap), and the API says
+// so with total_estimated and total_lower_bound: a page header reading "≈ 1 163 000 alerts" costs a
 // millisecond, while counting them exactly took 1.5–2.9 s of database CPU on
 // every request — under forty readers the database was saturated and ingest
 // itself started losing alerts.

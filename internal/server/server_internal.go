@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,6 +60,9 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	}
 }
 
+// statusClientClosedRequest is nginx's 499: the client went away first.
+const statusClientClosedRequest = 499
+
 func writeEngineError(w http.ResponseWriter, err error, keyVals ...any) {
 	if isNotFound(err) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
@@ -74,6 +78,15 @@ func writeEngineError(w http.ResponseWriter, err error, keyVals ...any) {
 	}
 	if errors.Is(err, engine.ErrConflict) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
+		return
+	}
+	// The client hung up (a browser leaving a page cancels its list requests):
+	// nothing failed and nobody is there to read an answer. Only Canceled —
+	// a DeadlineExceeded is a real timeout and stays an error. 499 is nginx's
+	// code for the same thing, so the metrics agree with the proxy's log.
+	if errors.Is(err, context.Canceled) {
+		slog.Debug("request_canceled", "err", err, "request_id", w.Header().Get("X-Request-ID"))
+		w.WriteHeader(statusClientClosedRequest)
 		return
 	}
 	args := append([]any{"err", err, "request_id", w.Header().Get("X-Request-ID")}, keyVals...)
@@ -104,7 +117,7 @@ func writeIngestError(w http.ResponseWriter, err error, source, key string) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
 		return
 	}
-	slog.Error("ingest_failed", "source", source, "key", key, "error", err, "request_id", w.Header().Get("X-Request-ID"))
+	slog.Error("ingest_failed", "source", source, "key", maskIntegrationKey(key), "error", err, "request_id", w.Header().Get("X-Request-ID"))
 	// A database that cannot serve right now is not the sender's fault, and the
 	// status code is what decides whether the alert is retried or dropped.
 	// Alertmanager, Grafana and webhook senders generally back off and retry a
@@ -258,7 +271,7 @@ func (srv *Server) withObservability(next http.Handler) http.Handler {
 		if r.URL.Path != "/live" && r.URL.Path != "/health" && r.URL.Path != "/ready" && r.URL.Path != "/metrics" {
 			slog.Debug("http_request",
 				"method", r.Method,
-				"path", r.URL.Path,
+				"path", redactPath(r.URL.Path),
 				"status", rec.status,
 				"duration_ms", dur.Milliseconds(),
 				"request_id", w.Header().Get("X-Request-ID"),
@@ -295,7 +308,7 @@ func (srv *Server) withTracing(next http.Handler) http.Handler {
 		// trace backend's grouping useless. The full path is an attribute.
 		ctx, span := tracing.Start(ctx, r.Method+" "+classifyHandler(r.URL.Path),
 			semconv.HTTPRequestMethodKey.String(r.Method),
-			semconv.URLPath(r.URL.Path),
+			semconv.URLPath(redactPath(r.URL.Path)),
 			semconv.ClientAddress(srv.clientIP(r)),
 		)
 		defer span.End()
@@ -337,6 +350,33 @@ func (srv *Server) withRecover(next http.Handler) http.Handler {
 		}()
 		next.ServeHTTP(w, r)
 	})
+}
+
+// maskIntegrationKey is how an integration key appears in logs and traces: the
+// form the API already shows a viewer (engine's mask) — enough to tell which
+// integration it was, never enough to send alerts with. The key is the whole
+// credential for the ingest routes, and telemetry has readers who have no
+// access to integration configuration.
+func maskIntegrationKey(key string) string {
+	if key == "" {
+		return ""
+	}
+	if len(key) <= 4 {
+		return "***"
+	}
+	return "***" + key[len(key)-4:]
+}
+
+// redactPath masks the credential in a path before it is logged or traced:
+// /integrations/v1/{type}/{key} carries the integration key as its last
+// segment. Other paths are returned unchanged.
+func redactPath(path string) string {
+	const prefix = "/integrations/v1/"
+	if !strings.HasPrefix(path, prefix) || pathDepth(path, prefix) != 2 {
+		return path
+	}
+	key := lastSegment(path)
+	return strings.TrimSuffix(strings.TrimSuffix(path, "/"), key) + maskIntegrationKey(key)
 }
 
 func classifyHandler(path string) string {

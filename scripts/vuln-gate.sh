@@ -28,13 +28,24 @@ cd "${ROOT_DIR}"
 ALLOWLIST="${NXS_ANOMALY_VULN_ALLOWLIST:-.vuln-allowlist.json}"
 GOVULNCHECK="${GOVULNCHECK:-govulncheck}"
 OUT="$(mktemp)"
-trap 'rm -f "${OUT}"' EXIT
+ERR="$(mktemp)"
+trap 'rm -f "${OUT}" "${ERR}"' EXIT
 
-# govulncheck exits non-zero when it finds something; we want the JSON either
-# way, and a real tool failure is caught by the empty-output check below.
-"${GOVULNCHECK}" -json ./... >"${OUT}" 2>/dev/null || true
+# In -json mode govulncheck exits 0 with findings too: only its text output
+# turns findings into exit code 3. So any non-zero exit here is the scan itself
+# failing — and the output is not evidence of anything. A scanner that fails
+# after writing its config object leaves valid JSON with no findings in it,
+# which used to read as "clean".
+rc=0
+"${GOVULNCHECK}" -json ./... >"${OUT}" 2>"${ERR}" || rc=$?
+if [ "${rc}" -ne 0 ]; then
+  echo "vuln-gate: govulncheck failed (exit ${rc}) — the scan did not complete"
+  cat "${ERR}"
+  exit 2
+fi
 if [ ! -s "${OUT}" ]; then
   echo "vuln-gate: govulncheck produced no output — the scan itself failed"
+  cat "${ERR}"
   exit 2
 fi
 

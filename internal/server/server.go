@@ -37,6 +37,10 @@ const maxRequestBody = 4 * 1024 * 1024 // 4 MiB
 // writeIngestError (503 while the database is unavailable, otherwise 500).
 var errWebhookSigInvalid = fmt.Errorf("webhook signature validation failed")
 
+// errWebhookSecretUnresolved is returned when the integration requires a
+// signature but its secret reference resolves to nothing in this process (503).
+var errWebhookSecretUnresolved = fmt.Errorf("webhook signature secret is not available on this instance")
+
 // Server is the HTTP server wrapping the engine.
 type Server struct {
 	eng     *engine.Engine
@@ -83,6 +87,11 @@ type Server struct {
 
 // New builds and starts the HTTP server. It blocks until the process receives SIGTERM or SIGINT.
 func New(ctx context.Context, s store.PostgreSQLStore, eng *engine.Engine, cfg Config) error {
+	if cfg.StartScheduler {
+		if err := checkWorkerPool(s); err != nil {
+			return err
+		}
+	}
 	// Reference-cache staleness only needs to hold until the next worker tick.
 	eng.SetReferenceCacheTTL(cfg.PollInterval)
 	var trustedProxies []*net.IPNet

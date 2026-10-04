@@ -4,6 +4,87 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.17] — 2026-10-04
+
+### Fixed
+- **A busy integration answers 503 + `Retry-After` instead of a dropped
+  connection.** The per-integration ingest queue was bounded by count only,
+  sized for single alerts; Alertmanager envelopes of 100 alerts made the same
+  queue a minute of work. Under load their POSTs waited up to 30 s, and past
+  the 30 s HTTP write timeout the server dropped the answer to an envelope it
+  then stored in full, so the sender sent it again (44 of 300 on a sandbox). An
+  ingest now waits at most 10 s for its turn.
+- **The alert list filtered to firing no longer reads the whole table.**
+  Migration `0035_alerts_firing_idx` indexes the firing alerts in the listing's
+  order; the capped total and the page come from it.
+- **Insights is three times faster.** The screen read the alert groups table in
+  full twice per request. Migration `0036_alert_groups_insights_idx` covers
+  what it counts, severity levels are worked out on the grouped rows rather than
+  per row, and the trend formats each day once: 0.6 s → 0.19 s on 210 000
+  groups, and 7.9 s → 2.3 s with ten readers at once.
+- **"10 000+" instead of "≈ 10 001".** When the planner's estimate is no better
+  than the 10 000 cap, the total is only a lower bound; listings now say so
+  (`total_lower_bound`) and the web UI shows "10000+".
+- **A team's ChatOps channel hears about an escalation step once.** The
+  channel belongs to every member of its team, and its notification was keyed
+  on the member, so a step paging a team of five posted the same alert to the
+  team's channel five times (and wrote five history rows). It is now keyed on
+  the group, the channel and the step execution; a REPEAT or a restarted chain
+  still posts again. The one message belongs to no member, so deleting the
+  member paged first no longer deletes it with their account. (GitHub #42,
+  thanks @lavr)
+- **A DNS hiccup no longer drops a webhook page.** With
+  `NXS_ANOMALY_BLOCK_PRIVATE_WEBHOOKS` on, a failed lookup in the pre-flight
+  was treated as a blocked destination: the notification was marked skipped,
+  terminally, and never sent. A lookup that fails is now retried like any
+  transport failure (and dead-letters if it never recovers); a name that
+  resolves to a non-public address is still refused. The issue channel had the
+  same path. (GitHub #44)
+- **A worker no longer stalls on a pool of fewer than three connections.**
+  The worker holds one connection for LISTEN and, under a shard lock, needs two
+  more; with `NXS_ANOMALY_DB_POOL_MAX=2` the escalation step waited forever for
+  a connection while PostgreSQL looked healthy. `run-worker`, and `serve` with
+  its scheduler, now refuse to start on such a pool and name the setting.
+  (GitHub #45)
+- **`scripts/vuln-gate.sh` no longer reports a failed scan as clean.** It
+  ignored govulncheck's exit status and only rejected empty output, so a
+  scanner that wrote its config object and then failed (for example, built with
+  an older Go than the project) passed the gate. Any non-zero exit is now a
+  scan failure, reported with govulncheck's own error. (GitHub #43)
+- **A silent SMTP server no longer stalls the worker.** Email went out through
+  `tls.Dial` / `smtp.SendMail`, which take neither a context nor a deadline:
+  a server that accepted the connection and never answered held the delivery
+  goroutine, and with it the delivery stage, the outcomes of the rest of the
+  batch and every later worker cycle. The whole send — dial, TLS, the SMTP
+  exchange — now runs under the delivery timeout every channel shares
+  (`NXS_ANOMALY_WEBHOOK_TIMEOUT_SECONDS`) and ends when the cycle's context
+  does, direct or through a proxy; a stalled server is a retryable failure.
+  (GitHub #46)
+
+### Changed
+- A request the client cancelled (a browser leaving a page) is no longer logged
+  as `engine error` at ERROR level; it is answered 499, like nginx logs it.
+
+### Security
+- **A webhook signature required through `env:` is no longer dropped when the
+  variable is missing.** An integration whose `webhook_secret` names an
+  environment variable that is missing or empty on an instance accepted
+  unsigned requests there, as if no secret were configured. Such requests are
+  now refused with `503` + `Retry-After`, nothing is ingested, and
+  `webhook_secret_unresolved` names the integration and the variable.
+  (GitHub #47)
+- **Integration keys stay out of logs and traces.** The ingest error line,
+  the debug access log and the `url.path` span attribute carried the key from
+  `/integrations/v1/<source>/{key}` in full; the key is the credential for those
+  routes. They now show it masked the way the API shows it to a viewer
+  (`***` and the last four characters). (GitHub #48)
+- **Only an admin can issue mobile credentials for a user.** `POST
+  /api/v1/mobile/devices` and `POST /api/v1/mobile/sessions` take any
+  `user_id` and fell back to the editor permission, so an editor could sign a
+  phone in as another user, an admin included (capped at responder there). Both
+  now require admin; a person signs their own phone in by pairing, as before.
+  (GitHub #49)
+
 ## [1.9.16] — 2026-10-03
 
 ### Fixed

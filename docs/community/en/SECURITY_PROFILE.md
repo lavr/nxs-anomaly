@@ -176,7 +176,10 @@ as a reference instead of a literal:
 ```
 
 The value is read from the named environment variable at the moment it is used,
-so the plaintext never sits in PostgreSQL. Under the production profile a **new**
+so the plaintext never sits in PostgreSQL. If the variable is missing or empty on
+an instance, a webhook that requires a signature is refused with `503` and
+`Retry-After` (and `webhook_secret_unresolved` in the log) rather than accepted
+unsigned. Under the production profile a **new**
 inline secret — one that is not a reference — is refused with a clear error;
 legacy values already in the database keep working, so upgrading a version does
 not break an installation and they can be moved to references at your own pace.

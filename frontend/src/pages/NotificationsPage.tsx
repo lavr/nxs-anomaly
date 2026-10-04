@@ -30,6 +30,7 @@ import { useVisibleInterval } from '../ui/useVisibleInterval';
 import { useI18n } from '../i18n/I18nProvider';
 import { useChannelLabel, useStatusLabel } from '../i18n/domain';
 import { EMPTY_VALUE } from '../i18n/format';
+import { pageTotalLabel } from '../api/pageTotal';
 
 const PAGE_SIZE = 50;
 
@@ -149,8 +150,7 @@ export function NotificationsPage() {
             w={220}
           />
           <Text size="sm" c="dimmed" ml="auto">
-            {notifications.data?.total_estimated ? '≈ ' : ''}
-            {plural('notifications.total', total)}
+            {pageTotalLabel(plural, 'notifications.total', notifications.data)}
           </Text>
         </Group>
       </Paper>

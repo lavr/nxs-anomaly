@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,6 +16,25 @@ import (
 	"github.com/nixys/nxs-anomaly/internal/store"
 	"github.com/nixys/nxs-anomaly/internal/utils"
 )
+
+// workerMinPoolConns is the smallest application pool a worker loop can run
+// on. It holds one connection for LISTEN for its whole life, and the shard
+// lock (and the Kafka outbox lock) holds a second while the work under it
+// asks the pool for a third. On two, that third never comes: the cycle waits
+// forever — the wait is not bounded by a context or by statement_timeout — and
+// PostgreSQL looks perfectly healthy.
+const workerMinPoolConns = 3
+
+// checkWorkerPool refuses to start a worker loop on a pool it would deadlock
+// on. A store that reports no pool size (a test double) is not judged.
+func checkWorkerPool(s store.PostgreSQLStore) error {
+	if n := s.PoolStats().MaxConns; n > 0 && n < workerMinPoolConns {
+		return fmt.Errorf("NXS_ANOMALY_DB_POOL_MAX=%d is below the %d connections the worker holds at once "+
+			"(LISTEN, an advisory lock, the transaction under it); raise it to at least %d",
+			n, workerMinPoolConns, workerMinPoolConns)
+	}
+	return nil
+}
 
 // applyCycleResult translates one RunWorkerCycle result map into Prometheus
 // counter increments. Shared by the embedded scheduler (serve) and the
@@ -98,6 +118,9 @@ type workerRuntime struct {
 // RunWorker runs the standalone worker loop with an observability HTTP endpoint.
 // It blocks until the process receives SIGTERM/SIGINT or ctx is cancelled.
 func RunWorker(ctx context.Context, s store.PostgreSQLStore, eng *engine.Engine, cfg Config) error {
+	if err := checkWorkerPool(s); err != nil {
+		return err
+	}
 	wr := &workerRuntime{
 		store:     s,
 		eng:       eng,

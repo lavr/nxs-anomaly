@@ -26,6 +26,7 @@ import { useListParams } from '../ui/useListParams';
 import { useSeverityLabel, useStatusLabel } from '../i18n/domain';
 import { EMPTY_VALUE } from '../i18n/format';
 import type { StringKey } from '../i18n/I18nProvider';
+import { pageTotalLabel } from '../api/pageTotal';
 
 const PAGE_SIZE = 50;
 
@@ -121,8 +122,7 @@ export function AlertsPage() {
             onChange={(next) => patch({ sort: next.field, order: next.desc ? 'desc' : 'asc' })}
           />
           <Text size="sm" c="dimmed" ml="auto">
-            {alerts.data?.total_estimated ? '≈ ' : ''}
-            {plural('alerts.total', total)}
+            {pageTotalLabel(plural, 'alerts.total', alerts.data)}
           </Text>
         </Group>
       </Paper>
