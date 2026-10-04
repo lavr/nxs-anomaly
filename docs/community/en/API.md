@@ -216,13 +216,17 @@ authenticated by the key alone. Returns `202 Accepted` (or `200` for victorops
 and the legacy pool), `404` for an unknown key, `400` on a validation error, `429`
 when the rate limit is exceeded, and `503` with `Retry-After` when the sender
 should come back: the database is unavailable, the transaction collided with
-another, or the integration already has 128 alerts queued on this replica.
+another, the integration already has 128 ingests queued on this replica, this
+one waited 10 s for its turn, or the integration's `webhook_secret` is an `env:`
+reference this instance cannot resolve.
 
 Ingests of one integration are written one after another, so one integration
 takes on the order of 25–100 alerts a second depending on the database. Each
 replica sends at most two of an integration's ingests to the database at a time
 and queues up to 128 more without holding a connection; past that it answers
-`503` at once. A storm on one integration therefore slows only that integration,
+`503` at once, and an ingest still waiting after 10 s gets `503` too — an
+Alertmanager envelope of a hundred alerts is a hundred times the work of one,
+and a longer wait would run into the 30 s HTTP write timeout. A storm on one integration therefore slows only that integration,
 not the rest of the API, and a sender that retries on `503` (Alertmanager,
 Grafana, most webhook clients) loses nothing.
 
@@ -487,8 +491,8 @@ reads the same rows through the store and is unaffected.
 | GET/PUT/DELETE | `/api/v1/chatops/channels/{id}` |
 | GET | `/api/v1/chatops/messages` (paginated) |
 | POST | `/api/v1/chatops/commands` |
-| GET/POST | `/api/v1/mobile/devices` |
-| POST | `/api/v1/mobile/sessions` |
+| GET/POST | `/api/v1/mobile/devices` — POST registers a device for any user: admin only |
+| POST | `/api/v1/mobile/sessions` — issues a session for any user's device: admin only (a person pairs their own phone below) |
 | POST | `/api/v1/mobile/pairing` — a one-time code to sign a phone in |
 | POST | `/api/v1/mobile/pairing/redeem` — exchange the code for a session (unauthenticated) |
 | DELETE | `/api/v1/mobile/sessions/current` — sign the phone out |

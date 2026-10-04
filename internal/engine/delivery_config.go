@@ -37,6 +37,10 @@ type SMTPConfig struct {
 	// Dial, when set, opens the SMTP connection through the configured SOCKS5
 	// proxy instead of dialling the server directly. See delivery_proxy.go.
 	Dial func(network, addr string) (net.Conn, error)
+	// Timeout bounds one whole send: dial, TLS and the SMTP exchange. It is the
+	// delivery timeout every channel shares (NXS_ANOMALY_WEBHOOK_TIMEOUT_SECONDS),
+	// which is what the claim-timeout arithmetic assumes of each provider call.
+	Timeout time.Duration
 }
 
 // DeliveryConfig holds all adapter credentials loaded once at startup.
@@ -293,6 +297,7 @@ func DeliveryConfigFromEnv() DeliveryConfig {
 			From:     smtpFrom,
 			UseTLS:   os.Getenv("NXS_ANOMALY_SMTP_USE_TLS") != "false",
 			Dial:     proxies.dialFunc("email", timeout),
+			Timeout:  timeout,
 		},
 		AsteriskInstances:       loadAsteriskInstances(proxies.dialFunc("call", timeout)),
 		MaxRetries:              maxRetries,

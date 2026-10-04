@@ -445,9 +445,15 @@ func pageEnvelope(items []map[string]any, total, limit, offset int) map[string]a
 		items = []map[string]any{}
 	}
 	page := map[string]any{"items": items, "total": total, "limit": limit, "offset": offset}
-	// Past store.ListTotalCap the store estimates instead of counting.
+	// Past store.ListTotalCap the store estimates instead of counting. When the
+	// planner's estimate is no better than the cap — it often undercounts a
+	// filtered listing — the store answers exactly ListTotalCap+1, which is
+	// then only a lower bound: "10000+" is true, "≈ 10 001" was not.
 	if total > store.ListTotalCap {
 		page["total_estimated"] = true
+		if total == store.ListTotalCap+1 {
+			page["total_lower_bound"] = true
+		}
 	}
 	return page
 }

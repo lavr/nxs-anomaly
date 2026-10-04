@@ -1676,7 +1676,10 @@ export interface paths {
             };
         };
         put?: never;
-        /** Register a mobile device */
+        /**
+         * Register a mobile device
+         * @description Registers a device for any user, so it is admin-only. A person signs their own phone in through /api/v1/mobile/pairing.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -1781,7 +1784,10 @@ export interface paths {
             };
         };
         put?: never;
-        /** Create a mobile session */
+        /**
+         * Create a mobile session
+         * @description Issues a session for any user's device, so it is admin-only. A person signs their own phone in through /api/v1/mobile/pairing.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -3233,6 +3239,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         } & {
             [key: string]: unknown;
         };
@@ -3243,6 +3251,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         } & {
             [key: string]: unknown;
         };
@@ -3254,6 +3264,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         /** @description One answerable question about the installation. `blocker` means alerts can be lost or nobody gets paged; `warning` is worth fixing but does not break the alert path. A check that could not run is reported as a blocker, never as a pass. */
         ReadinessCheck: {
@@ -3644,6 +3656,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         /** @description The required keys are the ones internal/model/alertgroup.go emits unconditionally for every group shape. The optional ones live in the model's Extra map: they are shape-dependent (a direct-paged group has no integration) or nullable state. */
         AlertGroup: {
@@ -3760,6 +3774,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         TeamPage: {
             items: components["schemas"]["Team"][];
@@ -3768,6 +3784,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         SchedulePage: {
             items: components["schemas"]["Schedule"][];
@@ -3776,6 +3794,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         /** @description Planned work on the named integrations. Alert groups those integrations open between starts_at and ends_at are recorded and silenced instead of paging anyone; `integration_ids` always names at least one integration, because an empty list would mean one typo silenced the whole deployment. */
         MaintenanceWindow: {
@@ -3798,6 +3818,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         EscalationChainPage: {
             items: components["schemas"]["EscalationChain"][];
@@ -3806,6 +3828,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         IntegrationPage: {
             items: components["schemas"]["Integration"][];
@@ -3814,6 +3838,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         AlertGroupPage: {
             items: components["schemas"]["AlertGroup"][];
@@ -3822,6 +3848,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         AlertPage: {
             items: components["schemas"]["Alert"][];
@@ -3830,6 +3858,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         NotificationPage: {
             items: components["schemas"]["Notification"][];
@@ -3838,6 +3868,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         /** @description One feature and why it is or is not usable here. */
         Capability: {
@@ -3891,6 +3923,8 @@ export interface components {
             offset: number;
             /** @description Present and true when total is the database planner's estimate rather than an exact count: listings count exactly up to 10 000 rows. */
             total_estimated?: boolean;
+            /** @description Present and true when the exact count passed 10 000 and the planner could not estimate beyond that: total is then 10 001, a lower bound ("10 000+"). */
+            total_lower_bound?: boolean;
         };
         MobilePairing: {
             /** @description One-time code, XXXXX-XXXXX (Crockford base32). Case, spaces and dashes are ignored on redemption. */

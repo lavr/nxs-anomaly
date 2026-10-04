@@ -96,6 +96,8 @@ A version is the file name without its `.sql` extension:
 | `0032_alert_groups_chain_idx` | A partial index on `escalation_chain_id` of unresolved alert groups. A paired phone asks on every event-stream tick which open groups concern its person; that is now asked by the chains that name them, and this index keeps it a lookup. Index only; rolling back leaves it unused. |
 | `0033_alert_groups_recent_unresolved_idx` | A partial index on `(last_received_at DESC, id)` of unresolved alert groups. A chat's `status` and `alerts` now count and page the open groups in the database, newest first, instead of loading them all; this index is their order. Index only. |
 | `0034_list_default_order_idx` | Indexes in the exact default order of the alert, alert group and notification listings (time column `DESC NULLS LAST`, then `id DESC`). Without them every page sorted the whole table. |
+| `0035_alerts_firing_idx` | A partial index on firing alerts in the listing's order. The alert list filtered to firing counts and pages from it instead of reading the table. |
+| `0036_alert_groups_insights_idx` | A covering index on alert groups' `created_at` with status and severity included. The insights tiles and trend are answered from it instead of reading the table twice. |
 
 ## The connection to the store code
 

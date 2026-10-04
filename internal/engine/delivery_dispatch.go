@@ -114,7 +114,7 @@ func (e *Engine) deliverNotificationViaAdapter(ctx context.Context, ntf map[stri
 
 	case "email":
 		text := renderNotificationText(ntf, payload, e.getNotificationTemplate(ctx, utils.StrVal(payload, "integration_id"), "email"))
-		status, errMsg, providerResp := sendEmail(target, emailSubject(payload), text, e.deliveryCfg.SMTP)
+		status, errMsg, providerResp := sendEmail(ctx, target, emailSubject(payload), text, e.deliveryCfg.SMTP)
 		if status == "delivered" {
 			return delivered(strDefault(providerResp, "smtp"), 0, "")
 		}
@@ -412,6 +412,9 @@ func (e *Engine) deliverIssue(ctx context.Context, payload map[string]any) (stat
 		return "failed", detail, ""
 	}
 	if err := checkWebhookURL(ctx, url, e.deliveryCfg.ssrfGuardFor("issue")); err != nil {
+		if isUnresolvedHost(err) {
+			return "failed", err.Error(), ""
+		}
 		return deliverySkipped, err.Error(), ""
 	}
 	token := utils.StrVal(payload, "token")

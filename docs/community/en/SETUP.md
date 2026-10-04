@@ -183,7 +183,7 @@ Connection pool:
 
 | Variable | Default | |
 |---|---|---|
-| `NXS_ANOMALY_DB_POOL_MAX` | `10` | maximum connections |
+| `NXS_ANOMALY_DB_POOL_MAX` | `10` | maximum connections. A process running the worker (`run-worker`, `serve` with its scheduler) needs at least 3: one is held for LISTEN, two more by a shard lock and the transaction under it; on a smaller pool it refuses to start |
 | `NXS_ANOMALY_API_READ_CONCURRENCY` | half of `NXS_ANOMALY_DB_POOL_MAX` | API reads (GET) running at once per process; the rest of the pool stays free for ingest, the worker and writes. A read that waits over 10 s gets 503 + `Retry-After` |
 | `NXS_ANOMALY_DB_POOL_MIN` | `1` | idle connections kept; `0` keeps none |
 | `NXS_ANOMALY_DB_POOL_MAX_CONN_LIFETIME_SECONDS` | `3600` | shed connections after a failover or through a load balancer |

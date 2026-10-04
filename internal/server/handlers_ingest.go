@@ -23,9 +23,16 @@ func (srv *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := srv.verifyWebhookSig(r, key, raw); err != nil {
-		if err == errWebhookSigInvalid {
+		switch err {
+		case errWebhookSigInvalid:
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-		} else {
+		case errWebhookSecretUnresolved:
+			// Our configuration, not the sender's request: 503 so the alert is
+			// retried once the secret is back rather than dropped as malformed.
+			srv.metrics.incIngestError("webhook")
+			w.Header().Set("Retry-After", "30")
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		default:
 			// The integration lookup failed. Through writeIngestError so it is
 			// logged and a database restart answers 503 + Retry-After, which the
 			// sender retries, rather than a silent 500, which it drops.

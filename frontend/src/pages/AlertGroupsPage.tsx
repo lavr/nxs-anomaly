@@ -55,6 +55,7 @@ import { useI18n } from '../i18n/I18nProvider';
 import { useSeverityLabel, useStatusLabel } from '../i18n/domain';
 import type { StringKey } from '../i18n/I18nProvider';
 import type { Messages } from '../i18n/messages';
+import { pageTotalLabel } from '../api/pageTotal';
 
 const PAGE_SIZE = 25;
 
@@ -364,8 +365,7 @@ export function AlertGroupsPage() {
               }
             />
             <Text size="sm" c="dimmed">
-              {groups.data?.total_estimated ? '≈ ' : ''}
-            {plural('groups.total', total)}
+              {pageTotalLabel(plural, 'groups.total', groups.data)}
             </Text>
           </Group>
         </Group>

@@ -317,6 +317,14 @@ func requiredAction(method, path string) authz.Action {
 	case hasPrefixPath(path, "/api/v1/backups"),
 		path == "/api/v1/readiness/acknowledge":
 		return authz.ActionAdmin
+	// Registering a device and issuing a session take any user_id: they issue
+	// credentials for somebody, which is administrative. Under the edit
+	// fallback an editor could sign a phone in as an admin and act as them
+	// (capped at responder). A person signs their own phone in by pairing,
+	// which is scoped to the caller above.
+	case method == http.MethodPost &&
+		(path == "/api/v1/mobile/devices" || path == "/api/v1/mobile/sessions"):
+		return authz.ActionAdmin
 	case method == http.MethodGet:
 		return authz.ActionRead
 	case isRespondPath(path):
