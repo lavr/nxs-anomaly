@@ -24,6 +24,7 @@ import (
 
 	"github.com/nixys/nxs-anomaly/internal/model"
 	"github.com/nixys/nxs-anomaly/internal/store"
+	"github.com/nixys/nxs-anomaly/internal/utils"
 )
 
 // Store is an in-memory store.PostgreSQLStore.
@@ -1172,6 +1173,16 @@ func (m *Store) RevokeUserSessions(_ context.Context, userID string) (int, error
 	for hash, sess := range m.sessions {
 		if sess.UserID == userID && !m.revoked[hash] {
 			m.revoked[hash] = true
+			n++
+		}
+	}
+	// Phones too, as the real store does.
+	ts := utils.ToISO(utils.UTCNow())
+	for _, sess := range m.data["mobile_sessions"] {
+		if sess["user_id"] == userID && sess["revoked_at"] == nil {
+			sess["revoked_at"] = ts
+			sess["is_active"] = false
+			sess["updated_at"] = ts
 			n++
 		}
 	}
