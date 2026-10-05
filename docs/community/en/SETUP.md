@@ -192,6 +192,28 @@ Connection pool:
 | `NXS_ANOMALY_DB_POOL_HEALTHCHECK_SECONDS` | `60` | how often idle connections are checked |
 | `NXS_ANOMALY_DB_CONNECT_MAX_WAIT_SECONDS` | `0` | retry the first connection for N seconds. Set it above zero under Kubernetes: the pod may start before the database accepts connections |
 
+**PostgreSQL behind PgBouncer.** Supported: a direct connection, or PgBouncer
+in **session** pooling (`pool_mode = session`). **Transaction and statement
+pooling are not supported**, and neither `NXS_ANOMALY_DB_STATEMENT_TIMEOUT_SECONDS=0`
+nor a bigger pool makes them work, because the service relies on session state:
+
+- migrations run under a session-level `pg_advisory_lock`, with
+  `SET statement_timeout = 0` / `RESET` around them on the same connection;
+- the worker holds a session-level `pg_try_advisory_lock` per shard while the
+  work under it runs on other pooled connections;
+- the worker keeps one connection with a standing `LISTEN` for wake-ups (it
+  falls back to polling, but the locks above have no fallback);
+- queries use pgx's cached prepared statements.
+
+In session pooling each of the service's connections holds a server
+connection for its lifetime, so size PgBouncer for the sum of
+`NXS_ANOMALY_DB_POOL_MAX` over every API and worker replica (`default_pool_size`
+and `max_client_conn`), and set `NXS_ANOMALY_DB_STATEMENT_TIMEOUT_SECONDS=0` or
+add `statement_timeout` to `ignore_startup_parameters`. Prepared statements need
+no extra setting in session mode. Supporting transaction pooling would mean
+moving coordination to transaction-scoped locks or leases and keeping the
+listener and migrations on a separate direct connection — tracked in GitHub #55.
+
 `0` is accepted only where the table says what it means. For the pool size, the
 connection lifetime, idle time and health-check period (`…_POOL_MAX`,
 `…_MAX_CONN_LIFETIME_SECONDS`, `…_MAX_CONN_IDLE_SECONDS`, `…_HEALTHCHECK_SECONDS`)

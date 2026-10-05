@@ -219,6 +219,15 @@ accepting deliberately:
   service can judge; `NXS_ANOMALY_EGRESS_ALLOWLIST` is the control for that.
   Before 1.4.3 the proxied destination was not checked at all, so a webhook to
   `http://169.254.169.254/` reached the proxy host's metadata service;
+- **every redirect hop is checked the same way** as the written URL: an IP
+  literal, a name resolving locally to a non-public address, and `localhost` or
+  any `*.localhost` name (loopback on whichever machine resolves it, the proxy
+  included) are refused before the proxy is asked. Before 1.9.19 a redirect was
+  judged only when its host was an IP literal, so a `307` to
+  `http://localhost/private` reached the proxy with the notification body
+  (GitHub #52). The same limit applies as above: a name only the proxy resolves
+  is the proxy's to judge — keep its ACL closed to its own loopback and private
+  networks, or restrict destinations with `NXS_ANOMALY_EGRESS_ALLOWLIST`;
 - **still in force**: `NXS_ANOMALY_EGRESS_ALLOWLIST`, against the written URL and
   at every redirect, plus the refusal of non-HTTP schemes and the ten-hop limit;
 - **channels without a proxy are checked in full**, as described in

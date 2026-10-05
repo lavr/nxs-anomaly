@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.19] — 2026-10-05
+
+### Security
+- **A webhook redirect to `localhost` no longer reaches the delivery proxy.**
+  With the private-address guard on, a proxied webhook checked its written URL
+  but judged a redirect hop only when the hop's host was an IP literal: a `307`
+  to `http://localhost/private` was handed to the proxy, notification body
+  included, and reported delivered. Every hop is now judged as the first one is:
+  an IP literal, a name that resolves locally to a non-public address, and
+  `localhost` or any `*.localhost` (loopback on whichever machine resolves it,
+  the proxy included) are refused before the proxy is asked. A name only the
+  proxy can resolve stays the proxy's to judge; PROXY.md says what its ACL must
+  close. (GitHub #52, thanks @lavr)
+
+### Documentation
+- **Which PgBouncer modes work.** SETUP.md now states it: a direct connection or
+  PgBouncer in session pooling. Transaction and statement pooling are not
+  supported — migrations and the worker coordinate through session-level
+  advisory locks, and the worker keeps a `LISTEN` connection. Checked behind
+  PgBouncer 1.26: in transaction pooling two replicas starting together ran the
+  migrations concurrently (duplicate-key failures, a leaked init lock, at most
+  one of two replicas up in three of three tries); in session pooling both
+  started and every page was delivered. (GitHub #55, thanks @lavr)
+
 ## [1.9.18] — 2026-10-04
 
 ### Security
