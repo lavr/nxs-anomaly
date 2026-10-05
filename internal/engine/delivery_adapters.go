@@ -153,9 +153,38 @@ func isUnresolvedHost(err error) bool {
 // A name that only the proxy's resolver maps to an internal address is outside
 // what this process can see; the egress allowlist is the control for that.
 func guardProxiedHost(ctx context.Context, host string, guard ssrfGuard) error {
+	return judgeProxiedHost(ctx, host, guard.blocks)
+}
+
+// loopbackNameAddrs stand in for what a "localhost" name reaches.
+var loopbackNameAddrs = []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback}
+
+// judgeProxiedHost is the verdict guardProxiedHost gives the first hop, as a
+// function of the block policy alone, so that every redirect hop gets the same
+// one (deliveryCheckRedirect). It used to be applied to the configured URL
+// only: a redirect to a name was never judged, and through a proxy the dial
+// guard never sees a hop either — a 307 to http://localhost/private reached
+// the proxy with the notification body (GitHub #52).
+//
+// "localhost" and its subdomains are loopback by definition (RFC 6761) on
+// whichever machine resolves them, the proxy included, so they are judged as
+// 127.0.0.1 and ::1 without asking the local resolver — whose answer would not
+// be the proxy's anyway. An exemption for the name still applies.
+func judgeProxiedHost(ctx context.Context, host string, blocked blockPolicy) error {
+	if blocked == nil {
+		return nil
+	}
 	if ip := net.ParseIP(host); ip != nil {
-		if guard.blocks(host, ip) {
+		if blocked(host, ip) {
 			return fmt.Errorf("blocked webhook host %s: non-public address", ip)
+		}
+		return nil
+	}
+	if name := strings.TrimSuffix(strings.ToLower(host), "."); name == "localhost" || strings.HasSuffix(name, ".localhost") {
+		for _, ip := range loopbackNameAddrs {
+			if blocked(host, ip) {
+				return fmt.Errorf("blocked webhook host %q: loopback name", host)
+			}
 		}
 		return nil
 	}
@@ -165,7 +194,7 @@ func guardProxiedHost(ctx context.Context, host string, guard ssrfGuard) error {
 		return nil
 	}
 	for _, ip := range ips {
-		if guard.blocks(host, ip.IP) {
+		if blocked(host, ip.IP) {
 			return fmt.Errorf("blocked webhook host %q resolves to non-public address %s", host, ip.IP)
 		}
 	}
@@ -255,11 +284,12 @@ func deliveryCheckRedirect(blocked blockPolicy, egress ChannelPolicy) func(*http
 		if blocked == nil {
 			return nil
 		}
-		// A redirect to a non-public IP literal is refused here, not only at
-		// dial time: through a proxy this process never dials the hop, so the
-		// dial guard would never see it.
-		if ip := net.ParseIP(req.URL.Hostname()); ip != nil && blocked(req.URL.Hostname(), ip) {
-			return fmt.Errorf("redirect refused: non-public address %s", ip)
+		// Every hop is judged here as the first one is (judgeProxiedHost), not
+		// only at dial time: through a proxy this process never dials the hop,
+		// so the dial guard would never see it. On a direct client the dial
+		// guard checks again, against the address it actually connects to.
+		if err := judgeProxiedHost(req.Context(), req.URL.Hostname(), blocked); err != nil {
+			return fmt.Errorf("redirect refused: %w", err)
 		}
 		return guardWebhookScheme(req.URL)
 	}
