@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.18] — 2026-10-04
+
+### Security
+- **Signing a person out everywhere signs their phones out too.** A password
+  change, an administrator's password reset or removal, and `DELETE
+  /api/v1/users/{id}/sessions` revoked web sessions only; a paired phone kept
+  its token and stayed signed in, so a stolen mobile token survived the very
+  actions meant to contain it. Web and mobile sessions are now revoked in one
+  transaction, and a failure on either reports the whole revocation failed.
+  An open mobile event stream ends at its next session check. (GitHub #50)
+
 ## [1.9.17] — 2026-10-04
 
 ### Fixed

@@ -3,7 +3,10 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
+
+	"github.com/nixys/nxs-anomaly/internal/utils"
 )
 
 // store_identity.go covers the two tables added by migration 0019: local user
@@ -211,14 +214,42 @@ func (s *pgStore) RevokeWebSession(ctx context.Context, tokenHash string) error 
 // user's ability to sign in changes — password reset, password removal,
 // deletion — so a stolen or stale session cannot outlive the credential it came
 // from.
+//
+// Everywhere means the phones too. Only web sessions used to be revoked, so a
+// stolen mobile token survived the password change and the administrative
+// "sign out everywhere" meant to contain exactly that. Both tables change in
+// one transaction: a failure on either reports the whole revocation failed,
+// never half of it done. The mobile row is revoked the way revokeMobileSession
+// does it — typed column and payload alike — because the token lookup reads the
+// column and the session list reads the payload.
 func (s *pgStore) RevokeUserSessions(ctx context.Context, userID string) (int, error) {
-	tag, err := s.pool.Exec(ctx,
-		"UPDATE nxs_anomaly_web_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL",
-		userID)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return 0, err
 	}
-	return int(tag.RowsAffected()), nil
+	defer tx.Rollback(ctx) //nolint:errcheck // rolled back only if Commit did not run
+
+	web, err := tx.Exec(ctx,
+		"UPDATE nxs_anomaly_web_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL",
+		userID)
+	if err != nil {
+		return 0, fmt.Errorf("revoke web sessions: %w", err)
+	}
+	ts := utils.ToISO(utils.UTCNow())
+	mobile, err := tx.Exec(ctx,
+		`UPDATE nxs_anomaly_mobile_sessions
+		    SET revoked_at = $2::timestamptz,
+		        updated_at = now(),
+		        data = data || jsonb_build_object('revoked_at', $2::text, 'is_active', false, 'updated_at', $2::text)
+		  WHERE user_id=$1 AND revoked_at IS NULL`,
+		userID, ts)
+	if err != nil {
+		return 0, fmt.Errorf("revoke mobile sessions: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return int(web.RowsAffected() + mobile.RowsAffected()), nil
 }
 
 // DeleteExpiredWebSessions removes sessions that expired or were revoked more

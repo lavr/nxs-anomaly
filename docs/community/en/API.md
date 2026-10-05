@@ -78,12 +78,12 @@ never returned in a response body.
 | POST | `/api/v1/auth/login` | unauthenticated | `{"login": "...", "password": "..."}` → a session cookie. Rate-limited per IP. |
 | POST | `/api/v1/auth/logout` | unauthenticated | Revokes the presented session. |
 | GET | `/api/v1/auth/me` | any | The current subject, its role and its effective permissions. |
-| POST | `/api/v1/auth/password` | any | Change your own password (`current_password`, `new_password`). Signs you out everywhere. |
+| POST | `/api/v1/auth/password` | any | Change your own password (`current_password`, `new_password`). Signs you out everywhere, paired phones included. |
 | GET | `/api/v1/auth/sessions` | any | Your own live sessions; your current one is marked `current`. |
 | DELETE | `/api/v1/auth/sessions/{id}` | any | Revoke one of your own sessions. Somebody else's id gives `404`. |
-| DELETE | `/api/v1/users/{id}/sessions` | admin | Sign a user out everywhere without touching their password. |
-| PUT | `/api/v1/users/{id}/password` | admin | Set another user's password. Signs them out. |
-| DELETE | `/api/v1/users/{id}/password` | admin | Remove a user's password. Signs them out. |
+| DELETE | `/api/v1/users/{id}/sessions` | admin | Sign a user out everywhere — web sessions and paired phones — without touching their password. |
+| PUT | `/api/v1/users/{id}/password` | admin | Set another user's password. Signs them out everywhere, phones included. |
+| DELETE | `/api/v1/users/{id}/password` | admin | Remove a user's password. Signs them out everywhere, phones included. |
 | GET | `/api/v1/users/{id}/export` | admin | Everything the installation holds about a person. The password hash and token hashes are never exported; the existence of a password is reported. The audit sections are bounded by `audit_export_limit`, and that number is returned in the response. |
 | POST | `/api/v1/users/{id}/erase` | admin | Erase a person's personal data. Credentials, sessions, devices and ChatOps channels are deleted; the user record, delivery addresses and `actor_name`/`request_ip` in the audit trail are pseudonymised; the audit events themselves are left alone. The response is a verification (`verified`, `residue`), not a promise; copies outside the database are listed in `out_of_scope`. Idempotent. |
 
