@@ -175,6 +175,13 @@ func (srv *Server) handleMobileEvents(w http.ResponseWriter, r *http.Request) {
 				slog.Info("mobile_stream_signed_out", "user_id", actor.ID)
 				return
 			}
+			// The next read uses who the person is now, not who they were when
+			// the stream opened: removed from a team, they must stop receiving
+			// its groups on this tick, as the regular API stops answering
+			// (GitHub #53). A failed lookup keeps the last known actor.
+			if err == nil {
+				ctx = authz.NewContext(r.Context(), again)
+			}
 		case <-heartbeat.C:
 			// An SSE comment: it keeps proxies and NAT from forgetting the
 			// connection without looking like an event to the client.

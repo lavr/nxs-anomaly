@@ -141,6 +141,39 @@ once the break-glass account is no longer needed.
 
 The roles are ordered: each includes everything the previous one grants.
 
+### Team scoping
+
+`NXS_ANOMALY_TEAM_SCOPING=true` limits a signed-in user to the objects of their
+teams plus the objects nobody owns. It is off by default.
+
+The rule:
+
+- an object **with no team is visible to everyone**, so turning the flag on
+  changes nothing on an installation where teams were never assigned;
+- an object owned by a team is visible to that team's members;
+- someone in **no** team sees the unowned objects and nothing else. Removing a
+  person from a team narrows what they see, never widens it;
+- **administrators, API keys and the worker are not scoped.**
+
+Integrations carry a `team_id` (migration 0020); schedules, ChatOps channels and
+maintenance windows carry their own. Alerts and alert groups are scoped through
+their integration rather than by copying `team_id` into every row, so a change
+of an integration's owner takes effect at once, with no stale rows left behind.
+
+A refusal is a `403`, and its message never names the owning team. Bulk actions
+on alert groups filter rather than fail: forbidden ids come back in a
+`forbidden` list next to `acknowledged`/`resolved`/`silenced`.
+
+Notifications carry the `integration_id` of their alert group (migration 0021)
+and are scoped through it. Delivery attempts inherit their notification's team,
+so a scoped caller must pass `notification_id` — the unfiltered feed would be
+every attempt in the installation and is refused with `400`; unscoped callers
+still get the whole feed. History and insights count only the integrations the
+caller may see, and the phone's dashboard and event stream follow the same rule
+with the person's current membership. `GET /api/v1/readiness` reports
+"Team boundaries are decided": a warning while scoping is off, and a blocker
+naming the integrations and schedules without a team once it is on.
+
 ### API keys (automation)
 
 | Environment variable | Format | Effect |

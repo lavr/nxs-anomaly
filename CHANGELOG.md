@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## [1.9.20] — 2026-10-06
+
+### Security
+- **Team scoping now holds on the phone too.** With `NXS_ANOMALY_TEAM_SCOPING`
+  on, the mobile dashboard and the event stream listed a group because the
+  person had been paged for it, without asking whether they may still read it:
+  removed from the team that owns the integration, a person got 403 from
+  `GET /api/v1/alert-groups/{id}` and the same group, freshly read, from
+  `/api/v1/mobile/dashboard`. Both now apply the same guard as the regular API,
+  and the event stream reads every tick with the person's current membership
+  rather than the one from when it opened. (GitHub #53, thanks @lavr)
+
+### Changed
+- **Team scoping is part of the community edition.** `NXS_ANOMALY_TEAM_SCOPING`
+  already took effect in community builds, while `/api/v1/capabilities` and
+  the readiness report called the team boundary an enterprise feature. Both
+  editions now say what they do: the capability reports `not_configured` or
+  `available`, the readiness check "Team boundaries are decided" runs in full,
+  and the community documentation describes the setting (SETUP.md, API.md).
+
 ## [1.9.19] — 2026-10-05
 
 ### Security

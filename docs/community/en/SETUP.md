@@ -237,6 +237,7 @@ Pick at least one before exposing the service.
 | `NXS_ANOMALY_API_KEYS` | `tok1:admin,tok2:viewer` — keys with roles: `admin`, `editor`, `responder`, `viewer`. A key given without a role is a viewer, not an admin |
 | `NXS_ANOMALY_API_KEY` | one admin key, for automation |
 | `NXS_ANOMALY_SESSION_TTL_SECONDS` | `43200` — how long a browser session lives |
+| `NXS_ANOMALY_TEAM_SCOPING` | `false`. `true` limits each user to the objects of their teams and the objects with no team; administrators, API keys and the worker are not limited. See [API.md](API.md#team-scoping) |
 | `NXS_ANOMALY_SESSION_COOKIE_SECURE` | `true`. Set it to `false` only for local HTTP: a Secure cookie over plain HTTP is accepted by the browser and never sent back, so sign-in appears to work and nothing stays signed in |
 
 Single sign-on through an OIDC provider is an enterprise feature. This build
