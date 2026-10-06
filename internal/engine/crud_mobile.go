@@ -505,8 +505,20 @@ func (e *Engine) mobileSnapshot(ctx context.Context, userID string) (map[string]
 
 	var activeGroups []map[string]any
 	for _, group := range unresolvedGroups {
-		if groupIsRelevantToUser(state, group, userID, userGroupSet, now) {
+		if !groupIsRelevantToUser(state, group, userID, userGroupSet, now) {
+			continue
+		}
+		// Relevance is not permission. Having been paged for a group says
+		// nothing about reading it now: removed from the team that owns its
+		// integration, a person got 403 from the regular API and the same
+		// group, freshly read, from the dashboard and the event stream
+		// (GitHub #53). The same guard as GET /alert-groups/{id} decides.
+		switch err := e.authorizeItem(ctx, "alert_groups", group); {
+		case err == nil:
 			activeGroups = append(activeGroups, group)
+		case isForbidden(err):
+		default:
+			return nil, nil, nil, err
 		}
 	}
 	var oncall []map[string]any
