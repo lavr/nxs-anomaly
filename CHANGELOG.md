@@ -4,6 +4,41 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning once it reaches 1.0.
 
+## Unreleased
+
+### Added
+- **ChatOps channels read integration templates.** A channel posted to through
+  its `webhook_url` takes `templates.chatops`, then the key named after its
+  `platform` (`slack`, `mattermost`, …), then `default`; a Telegram ChatOps
+  channel reads `chatops` before `telegram`. Without a template the text is the
+  built-in one, as before.
+- **Links in notification templates.** Every template can use `group_url` (the
+  group's page, from `NXS_ANOMALY_PUBLIC_URL`) and the source's links
+  `generator_url`, `dashboard_url`, `panel_url`, `silence_url`, which are now
+  carried from the alert to its group. All five are empty strings when unknown.
+  The built-in ChatOps text ends with the group's page when
+  `NXS_ANOMALY_PUBLIC_URL` is set.
+
+## [1.9.20] — 2026-10-06
+
+### Security
+- **Team scoping now holds on the phone too.** With `NXS_ANOMALY_TEAM_SCOPING`
+  on, the mobile dashboard and the event stream listed a group because the
+  person had been paged for it, without asking whether they may still read it:
+  removed from the team that owns the integration, a person got 403 from
+  `GET /api/v1/alert-groups/{id}` and the same group, freshly read, from
+  `/api/v1/mobile/dashboard`. Both now apply the same guard as the regular API,
+  and the event stream reads every tick with the person's current membership
+  rather than the one from when it opened. (GitHub #53, thanks @lavr)
+
+### Changed
+- **Team scoping is part of the community edition.** `NXS_ANOMALY_TEAM_SCOPING`
+  already took effect in community builds, while `/api/v1/capabilities` and
+  the readiness report called the team boundary an enterprise feature. Both
+  editions now say what they do: the capability reports `not_configured` or
+  `available`, the readiness check "Team boundaries are decided" runs in full,
+  and the community documentation describes the setting (SETUP.md, API.md).
+
 ## [1.9.19] — 2026-10-05
 
 ### Security

@@ -51,14 +51,18 @@ func TestCommunityOIDCEndpointAnswers501NotSilence(t *testing.T) {
 
 // TestCommunityCapabilitiesNameTheEdition: the capabilities report is what the
 // UI reads to draw a feature as blocked rather than absent, so the state has to
-// be the one that says "a different edition", not "not set up".
+// be the one that says "a different edition", not "not set up". The team
+// boundary ships in this edition and is merely not configured by default.
 func TestCommunityCapabilitiesNameTheEdition(t *testing.T) {
 	srv, _ := newSessionServer(t)
 
 	caps := readCapabilities(t, srv)
-	for _, name := range []string{"sso", "team_scoping", "analytics_stream"} {
+	for _, name := range []string{"sso", "analytics_stream"} {
 		if got := caps[name].State; got != capNotInEdition {
 			t.Errorf("%s state = %q, want %q", name, got, capNotInEdition)
 		}
+	}
+	if got := caps["team_scoping"].State; got != capNotConfigured {
+		t.Errorf("team_scoping state = %q, want %q", got, capNotConfigured)
 	}
 }

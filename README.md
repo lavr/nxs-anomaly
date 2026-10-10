@@ -38,13 +38,13 @@ acknowledgements and resolutions in one shared timeline.
 | Act on an alert                           | Acknowledge, resolve and silence in the web interface; ChatOps actions where configured                                    |
 | Understand what happened                  | Alert timelines, audit history and delivery attempts                                                                       |
 | Self-host the service                     | Password sign-in, role-based access, REST API, Prometheus metrics, OpenTelemetry tracing and a production security profile |
+| Separate access between teams             | Team boundaries: each user sees and acts on their teams' integrations, schedules and alerts, plus unowned ones              |
 
 #### When to use Enterprise Edition
 
 | Requirements | Capabilities |
 |---|---|
 | Integrate with corporate identity providers | OIDC authentication and centralized access management |
-| Separate access between multiple teams | Team access boundaries and advanced permissions |
 | Analyze incident lifecycle and operational metrics | Event streaming through Kafka and analytics integrations |
 | Need dedicated deployment and support options | Enterprise deployment options and commercial support |
 
@@ -60,7 +60,7 @@ acknowledgements and resolutions in one shared timeline.
 
 ### How it works
 
-![Alert flow: ingestion and routing, on-call escalation, notification delivery, acknowledgement and resolution](assets/nxs-anomaly-alert-flow.png)
+![Alert flow: ingestion and routing, on-call escalation, notification delivery, acknowledgement and resolution](assets/nxs-anomaly-alert-flow.svg)
 
 ## Quickstart
 

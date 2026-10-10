@@ -28,6 +28,7 @@ func (e *Engine) deliverNotificationViaAdapter(ctx context.Context, ntf map[stri
 	if payload == nil {
 		payload = map[string]any{}
 	}
+	payload = withGroupURL(payload, e.deliveryCfg.PublicURL)
 
 	// The span the whole feature is for. A provider call is the one step in the
 	// pipeline whose duration is outside this service's control, so "the alert
@@ -105,7 +106,14 @@ func (e *Engine) deliverNotificationViaAdapter(ctx context.Context, ntf map[stri
 		return res
 
 	case "telegram":
-		text := renderNotificationText(ntf, payload, e.getNotificationTemplate(ctx, utils.StrVal(payload, "integration_id"), "telegram"))
+		// A Telegram ChatOps channel is delivered through this adapter, but it
+		// is the team's channel: it reads the chatops template first, the same
+		// as a channel posted to through a webhook.
+		keys := []string{"telegram"}
+		if utils.StrVal(payload, "chatops_channel_id") != "" {
+			keys = []string{"chatops", "telegram"}
+		}
+		text := renderNotificationText(ntf, payload, e.getNotificationTemplate(ctx, utils.StrVal(payload, "integration_id"), keys...))
 		return e.sendTelegramOutcome(ctx, target, text,
 			utils.StrVal(payload, "alert_group_id"), telegramShiftOptions{
 				offerCheckin: utils.BoolVal(payload, "offer_checkin", false),
@@ -166,6 +174,25 @@ func (e *Engine) deliverNotificationViaAdapter(ctx context.Context, ntf map[stri
 	default:
 		return failed("", fmt.Sprintf("unsupported channel: %s", channel), 0, "")
 	}
+}
+
+// withGroupURL adds the group's page to the payload the adapters render.
+//
+// Added at delivery rather than when the notification is queued: the address
+// depends on NXS_ANOMALY_PUBLIC_URL, which an operator may set or correct after
+// the alert fired, and a retry should carry the current one. A copy, so the
+// claimed row's payload is not edited in passing.
+func withGroupURL(payload map[string]any, publicURL string) map[string]any {
+	url := AlertGroupURL(publicURL, utils.StrVal(payload, "alert_group_id"))
+	if url == "" {
+		return payload
+	}
+	out := make(map[string]any, len(payload)+1)
+	for k, v := range payload {
+		out[k] = v
+	}
+	out["group_url"] = url
+	return out
 }
 
 // sendTelegramOutcome wraps the Telegram adapter in the outcome contract.
@@ -279,8 +306,21 @@ func (e *Engine) deliverChatops(ctx context.Context, ntf map[string]any, channel
 	if err != nil {
 		return skipped(skipNotConfigured, "chatops channel "+utils.StrVal(channel, "name")+": "+err.Error())
 	}
-	text := renderNotificationText(ntf, payload, "")
-	proxyChannel := e.deliveryCfg.chatopsProxyChannel(utils.StrVal(channel, "platform"))
+	platform := utils.StrVal(channel, "platform")
+	// chatops first, so one template can serve every team channel whatever it
+	// runs on; then the platform's own key, so a Slack channel can share the
+	// template written for Slack elsewhere; then default.
+	tmpl := e.getNotificationTemplate(ctx, utils.StrVal(payload, "integration_id"), "chatops", platform)
+	text := renderNotificationText(ntf, payload, tmpl)
+	if tmpl == "" {
+		// A channel is where several people read the same alert, and the one
+		// who takes it needs the page with its timeline and buttons. Only on
+		// the built-in text: a template decides for itself, via group_url.
+		if url := utils.StrVal(payload, "group_url"); url != "" {
+			text += "\n" + url
+		}
+	}
+	proxyChannel := e.deliveryCfg.chatopsProxyChannel(platform)
 	res := postWebhookGuarded(ctx, e.deliveryCfg.clientFor(proxyChannel), webhookURL,
 		map[string]any{"text": text}, e.deliveryCfg.ssrfGuardFor(proxyChannel), headers)
 	res.ProviderStatus = utils.StrVal(channel, "platform") + "_chatops"
@@ -308,11 +348,13 @@ func (e *Engine) templateCacheTTL() time.Duration {
 	return refCacheTTL
 }
 
-func (e *Engine) getNotificationTemplate(ctx context.Context, integrationID, channel string) string {
+// getNotificationTemplate returns the integration's template for the first of
+// keys that has one, falling back to "default", or "" for the built-in text.
+func (e *Engine) getNotificationTemplate(ctx context.Context, integrationID string, keys ...string) string {
 	if integrationID == "" {
 		return ""
 	}
-	key := integrationID + ":" + channel
+	key := integrationID + ":" + strings.Join(keys, ",")
 	now := time.Now()
 	var stale string
 	var haveStale bool
@@ -338,9 +380,11 @@ func (e *Engine) getNotificationTemplate(ctx context.Context, integrationID, cha
 		return ""
 	}
 	templates, _ := integ["templates"].(map[string]any)
-	t := utils.StrVal(templates, channel)
-	if t == "" {
-		t = utils.StrVal(templates, "default")
+	var t string
+	for _, k := range append(keys, "default") {
+		if t = utils.StrVal(templates, k); t != "" {
+			break
+		}
 	}
 	e.templateCache.Store(key, templateCacheEntry{value: t, loadedAt: now})
 	return t
