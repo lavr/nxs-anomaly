@@ -3101,6 +3101,8 @@ export interface components {
             } | null;
             /** @description Channel id on the platform itself (Slack channel id, Telegram chat id); inbound commands name this, not the internal id. */
             external_id: string;
+            /** @description Whether the channel is posted to whenever an escalation step pages a member of its team (or its user). Defaults to true. False makes it hear only from NOTIFY_CHATOPS_CHANNEL steps that name it — the setting for one room per system, where a person on two systems' teams would otherwise carry one system's alert into the other's room. */
+            membership_fanout?: boolean;
             /** @description For a slack or mattermost channel: post alerts with the Acknowledge, Resolve, Silence and Open buttons a personal Slack or Mattermost notification carries (Mattermost also needs NXS_ANOMALY_PUBLIC_URL and NXS_ANOMALY_MATTERMOST_ACTION_SECRET). Taps arrive at the existing interactive endpoints and are matched to this channel by external_id. Defaults to false; a telegram channel always has its buttons. */
             interactive?: boolean;
             /** @description How to edit a message posted through webhook_url, so that acknowledge, unacknowledge and resolve rewrite the alert's message instead of posting a new one. The id of the posted message is read from the response to the post at message_id_path; the edit is a request with method to url, where {message_id} is replaced by that id, with the post's JSON body plus "message_id". Without it, without an id, or when the platform refuses the edit with a 4xx, the status is posted as a new message. Ignored for the telegram platform. null or {} removes it. url may be an env: reference and is masked for readers who may not edit configuration. */
@@ -3492,13 +3494,15 @@ export interface components {
         EscalationStep: {
             id?: string;
             /** @enum {string} */
-            kind: "WAIT" | "NOTIFY_USER" | "NOTIFY_SCHEDULE" | "NOTIFY_TEAM" | "NOTIFY_EMERGENCY" | "NOTIFY_DUTY_USERS" | "TRIGGER_WEBHOOK" | "CREATE_ISSUE" | "RESOLVE" | "REPEAT";
+            kind: "WAIT" | "NOTIFY_USER" | "NOTIFY_SCHEDULE" | "NOTIFY_TEAM" | "NOTIFY_EMERGENCY" | "NOTIFY_DUTY_USERS" | "NOTIFY_CHATOPS_CHANNEL" | "TRIGGER_WEBHOOK" | "CREATE_ISSUE" | "RESOLVE" | "REPEAT";
             position?: number;
             delay_minutes?: number;
             user_ids?: string[];
             schedule_id?: string;
             /** @description Accept a schedule with coverage gaps in the next 7 days. */
             allow_uncovered?: boolean;
+            /** @description NOTIFY_CHATOPS_CHANNEL only: the ChatOps channel the alert is posted to, whoever is or is not on its team. Required for that kind; a channel named by a step cannot be deleted. */
+            channel_id?: string;
             team_id?: string | null;
             fallback_to_all?: boolean;
             user_id?: string | null;

@@ -80,6 +80,26 @@ func (e *Engine) advanceGroupLocked(state *store.State, g model.AlertGroup, time
 				g.AppendLog("team_empty", "Team escalation step has no members", nil)
 			}
 
+		case StepNotifyChatopsChannel:
+			// The channel is addressed, not reached through whoever was
+			// paged: the alert of a system goes to that system's room even
+			// when nobody is on its team, and to no other room.
+			channelID := utils.StrVal(step, "channel_id")
+			ch := state.ChatopsChannels[channelID]
+			switch {
+			case ch == nil:
+				g.AppendLog("chatops_channel_missing", "ChatOps channel step names a channel that no longer exists",
+					map[string]any{"channel_id": channelID})
+			case !utils.BoolVal(ch, "notifications_enabled", true):
+				g.AppendLog("chatops_channel_muted", "ChatOps channel step skipped: the channel has notifications disabled",
+					map[string]any{"channel_id": channelID})
+			default:
+				e.postToChatopsChannel(state, g, ch, nil, "chatops channel notification", timestamp,
+					notificationIdemSet(state))
+				g.AppendLog("chatops_channel_notified", "Posted to ChatOps channel "+utils.StrVal(ch, "name"),
+					map[string]any{"channel_id": channelID})
+			}
+
 		case StepNotifyEmergency:
 			recipients := e.emergencyUserIDs(state, g, utils.StrVal(step, "user_id"))
 			if len(recipients) > 0 {

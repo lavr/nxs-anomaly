@@ -225,6 +225,7 @@ api -X POST "$API/api/v1/escalation-chains" -d '{
 | `NOTIFY_TEAM` | `team_id` | Pages every member of the team |
 | `NOTIFY_DUTY_USERS` | `team_id`, `fallback_to_all` | Pages whoever has the `on_duty` flag raised |
 | `NOTIFY_EMERGENCY` | `user_id` | The emergency recipient. Without `user_id`, `emergency_user_id` from the integration's policy is used |
+| `NOTIFY_CHATOPS_CHANNEL` | `channel_id` | Posts the alert to one ChatOps channel, whoever is or is not on its team — see [section 8](#8-chatops) |
 | `TRIGGER_WEBHOOK` | `webhook_url`, `headers` | An outbound HTTP call |
 | `CREATE_ISSUE` | `url`, `tracker_type`, `token_env`, `project`, templates | Opens a ticket in a tracker |
 | `RESOLVE` | — | Closes the group automatically |
@@ -248,6 +249,26 @@ those the group with the highest `priority`. If nobody is on duty:
 - `fallback_to_all: true` (the default) — every candidate is paged;
 - `fallback_to_all: false` — nobody is paged, and `no_duty_users` appears in the
   group timeline.
+
+**`NOTIFY_CHATOPS_CHANNEL` addresses a room, not people.** Every other notifying
+step reaches channels only through the people it pages: each channel of each team
+the paged person is in is posted to. That works for one team and one room. With a
+room per system it does not: somebody on the teams of systems A and B carries A's
+alert into B's room, and a system whose team is empty posts nowhere. This step
+posts to the channel it names; give that channel `"membership_fanout": false` and
+it hears only from such steps. A chain for one system then reads:
+
+```json
+[{"kind": "NOTIFY_CHATOPS_CHANNEL", "channel_id": "chat_..."},
+ {"kind": "NOTIFY_SCHEDULE", "schedule_id": "sch_..."}]
+```
+
+`channel_id` is required and must exist; a channel named by a step cannot be
+deleted. The message is the same one membership fan-out sends — one per channel
+and step execution, with templates, status messages and edits — and a channel
+reached both ways in one step is posted to once. A channel that is gone or has
+`notifications_enabled: false` when the step runs is skipped, and the group's
+timeline says so.
 
 **`REPEAT` counts repeats per group.** `from_position` is a zero-based step index.
 When `max_repeat_count` is exhausted, escalation stops and writes
@@ -630,6 +651,12 @@ the usual retries; templates see it with `{{ .event }}` set (see
 ALERT_PROCESSING.md §5.3). The switch is off by default, like
 `NXS_ANOMALY_NOTIFY_ON_RESOLVE`, and independent of it: that one tells *people*
 that an alert is over.
+
+**Which alerts a channel hears.** By default a channel is posted to whenever a step
+pages a member of its team (or its `user_id`). `"membership_fanout": false` turns
+that off: the channel then hears only from `NOTIFY_CHATOPS_CHANNEL` steps that name
+it ([section 4](#every-step-type)). Use it for a room per system, where people
+belong to several systems' teams.
 
 **Buttons in a Slack or Mattermost channel.** A Telegram channel has always shown
 the alert with its buttons. A `slack` or `mattermost` channel does when it is

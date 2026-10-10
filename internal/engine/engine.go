@@ -27,12 +27,17 @@ const (
 	StepCreateIssue     = "CREATE_ISSUE"
 	StepResolve         = "RESOLVE"
 	StepRepeat          = "REPEAT"
+
+	// StepNotifyChatopsChannel posts the alert to one ChatOps channel, named
+	// by the step rather than reached through somebody's team membership.
+	StepNotifyChatopsChannel = "NOTIFY_CHATOPS_CHANNEL"
 )
 
 var supportedSteps = map[string]bool{
 	StepWait: true, StepNotifyUser: true, StepNotifySchedule: true,
 	StepNotifyTeam: true, StepNotifyEmergency: true, StepNotifyDutyUsers: true,
 	StepTriggerWebhook: true, StepCreateIssue: true, StepResolve: true, StepRepeat: true,
+	StepNotifyChatopsChannel: true,
 }
 
 var supportedShiftRecurrences = map[string]bool{"none": true, "daily": true, "weekly": true}

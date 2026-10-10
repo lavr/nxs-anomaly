@@ -288,6 +288,18 @@ func (e *Engine) sanitizeStep(ctx context.Context, raw any, index int) (map[stri
 		}
 		step["team_id"] = teamID
 
+	case StepNotifyChatopsChannel:
+		// Required, unlike a team: a step that posts to no channel is not a
+		// shortcut for "nobody", it is a chain that silently tells no room.
+		channelID := utils.StrVal(m, "channel_id")
+		if channelID == "" {
+			return nil, errValidation(fmt.Sprintf("step %d: NOTIFY_CHATOPS_CHANNEL requires channel_id", index+1))
+		}
+		if err := e.ensureItemsExist(ctx, "chatops_channels", "unknown chatops channels", []string{channelID}); err != nil {
+			return nil, err
+		}
+		step["channel_id"] = channelID
+
 	case StepNotifyEmergency:
 		userID := utils.StrVal(m, "user_id")
 		if userID != "" {

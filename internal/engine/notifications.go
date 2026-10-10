@@ -185,13 +185,17 @@ func (e *Engine) attachNotificationBatch(state *store.State, g model.AlertGroup,
 }
 
 // fanoutChatopsNotifications sends notifications to chatops channels the user belongs to.
+//
+// A channel that opted out of membership fan-out (membership_fanout: false) is
+// skipped here: it hears only from the NOTIFY_CHATOPS_CHANNEL steps that name
+// it. Fan-out by membership posts to every channel of every team the paged
+// person is in, so somebody on two systems' teams carries one system's alert
+// into the other's room.
 func (e *Engine) fanoutChatopsNotifications(state *store.State, g model.AlertGroup, user map[string]any, reason, timestamp string, seen map[string]struct{}) {
 	userID := utils.StrVal(user, "id")
-	stepKey := g.EscalationKey()
-	groupID := g.ID()
 
 	for _, ch := range state.ChatopsChannels {
-		if !utils.BoolVal(ch, "notifications_enabled", true) {
+		if !utils.BoolVal(ch, "notifications_enabled", true) || !utils.BoolVal(ch, "membership_fanout", true) {
 			continue
 		}
 		belongs := utils.StrVal(ch, "user_id") == userID
@@ -211,58 +215,68 @@ func (e *Engine) fanoutChatopsNotifications(state *store.State, g model.AlertGro
 		if !belongs {
 			continue
 		}
-
-		channelID := utils.StrVal(ch, "id")
-		platform := utils.StrVal(ch, "platform")
-		channelName := utils.StrVal(ch, "name")
-
-		// Keyed on the channel and the step execution, not on the member: a
-		// step that pages a team reaches every member, the team's channel
-		// belongs to each of them, and it is still one room. With the member in
-		// the key the channel read the same alert once per person on the team.
-		// The history row below is skipped with it, for the same reason.
-		idemKey := fmt.Sprintf("%s:chatops:%s:%s", groupID, channelID, stepKey)
-		if _, dup := seen[idemKey]; dup {
-			continue
-		}
-
-		// A Telegram channel goes out through the bot, to its chat id; every
-		// other platform through the channel's own incoming webhook, which the
-		// delivery step looks up by channel id. Queued, not assumed: the
-		// delivery step is what decides whether there is a transport.
-		ref := model.ChatChannelRef{ID: channelID, Channel: "chatops", Target: channelID}
-		if platform == "telegram" {
-			ref.Channel, ref.Target = "telegram", channelName
-		}
-		// No user_id: the channel's one message per step belongs to the team,
-		// not to whichever member happened to be paged first. Attributed to a
-		// member, it would be deleted with that member's account (the
-		// foreign key cascades) and scrubbed by their personal-data erasure.
-		// The member stays in the payload, where templates read user_name.
-		ntf := buildNotification(g, "", ref.Channel, ref.Target, reason, timestamp, idemKey)
-		payload := notificationPayload(g, user, reason)
-		// Marks this as the team's channel rather than a person's chat, so
-		// the Telegram adapter reads the chatops template first.
-		payload["chatops_channel_id"] = channelID
-		ntf.ScheduleDelivery(payload)
-		addNotification(state, ntf, seen)
-
-		// The message history must not claim an outbound message that had
-		// nowhere to go. Whether this channel has a transport is known here —
-		// it is the same webhook_url the delivery step will look for — so the
-		// row records that, and points at the notification whose delivery
-		// carries the final answer.
-		deliveryStatus := "queued"
-		if platform != "telegram" && utils.StrVal(ch, "webhook_url") == "" {
-			deliveryStatus = "skipped_no_transport"
-		} else {
-			// Only a channel that could show the alert has anything to update
-			// when its status changes.
-			ref.NotificationID = ntf.ID()
-			g.AddNotifiedChatChannel(ref)
-		}
-		recordChatopsOutbound(state, channelID, ntf.ID(), deliveryStatus, g, reason, timestamp)
+		e.postToChatopsChannel(state, g, ch, user, reason, timestamp, seen)
 	}
+}
+
+// postToChatopsChannel queues one alert message for a channel. Both ways a
+// channel is reached go through it — membership fan-out and the
+// NOTIFY_CHATOPS_CHANNEL step — so they share one key and a step that does
+// both still posts once.
+//
+// user is the person paged alongside, when there is one; it only fills the
+// template's user_name.
+func (e *Engine) postToChatopsChannel(state *store.State, g model.AlertGroup, ch, user map[string]any, reason, timestamp string, seen map[string]struct{}) {
+	channelID := utils.StrVal(ch, "id")
+	platform := utils.StrVal(ch, "platform")
+	channelName := utils.StrVal(ch, "name")
+
+	// Keyed on the channel and the step execution, not on the member: a
+	// step that pages a team reaches every member, the team's channel
+	// belongs to each of them, and it is still one room. With the member in
+	// the key the channel read the same alert once per person on the team.
+	// The history row below is skipped with it, for the same reason.
+	idemKey := fmt.Sprintf("%s:chatops:%s:%s", g.ID(), channelID, g.EscalationKey())
+	if _, dup := seen[idemKey]; dup {
+		return
+	}
+
+	// A Telegram channel goes out through the bot, to its chat id; every
+	// other platform through the channel's own incoming webhook, which the
+	// delivery step looks up by channel id. Queued, not assumed: the
+	// delivery step is what decides whether there is a transport.
+	ref := model.ChatChannelRef{ID: channelID, Channel: "chatops", Target: channelID}
+	if platform == "telegram" {
+		ref.Channel, ref.Target = "telegram", channelName
+	}
+	// No user_id: the channel's one message per step belongs to the team,
+	// not to whichever member happened to be paged first. Attributed to a
+	// member, it would be deleted with that member's account (the
+	// foreign key cascades) and scrubbed by their personal-data erasure.
+	// The member stays in the payload, where templates read user_name.
+	ntf := buildNotification(g, "", ref.Channel, ref.Target, reason, timestamp, idemKey)
+	payload := notificationPayload(g, user, reason)
+	// Marks this as the team's channel rather than a person's chat, so
+	// the Telegram adapter reads the chatops template first.
+	payload["chatops_channel_id"] = channelID
+	ntf.ScheduleDelivery(payload)
+	addNotification(state, ntf, seen)
+
+	// The message history must not claim an outbound message that had
+	// nowhere to go. Whether this channel has a transport is known here —
+	// it is the same webhook_url the delivery step will look for — so the
+	// row records that, and points at the notification whose delivery
+	// carries the final answer.
+	deliveryStatus := "queued"
+	if platform != "telegram" && utils.StrVal(ch, "webhook_url") == "" {
+		deliveryStatus = "skipped_no_transport"
+	} else {
+		// Only a channel that could show the alert has anything to update
+		// when its status changes.
+		ref.NotificationID = ntf.ID()
+		g.AddNotifiedChatChannel(ref)
+	}
+	recordChatopsOutbound(state, channelID, ntf.ID(), deliveryStatus, g, reason, timestamp)
 }
 
 // recordChatopsOutbound mirrors a message sent to a channel into its history.

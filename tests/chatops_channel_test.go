@@ -201,3 +201,56 @@ func TestChatopsMessageSurvivesTheMemberInPostgres(t *testing.T) {
 		t.Errorf("%d channel messages after the member was deleted, want 1", got)
 	}
 }
+
+// A chain that names a channel posts to it through the real store, although
+// nobody is on the channel's team — and the channel cannot be deleted while
+// the chain names it.
+func TestChatopsChannelStepInPostgres(t *testing.T) {
+	ctx := context.Background()
+	st, eng := newIntegrationEngine(t, ctx)
+	defer st.Close()
+	clearStore(t, ctx, st)
+	adminCtx := chatopsAdmin(ctx)
+
+	channel, err := eng.CreateChatopsChannel(adminCtx, map[string]any{
+		"platform": "mattermost", "name": "#system-a", "webhook_url": "https://chat.example.com/hooks/a",
+		"membership_fanout": false,
+	})
+	if err != nil {
+		t.Fatalf("create channel: %v", err)
+	}
+	channelID := utils.StrVal(channel, "id")
+	chain, err := eng.CreateEscalationChain(adminCtx, map[string]any{
+		"name":  "system a",
+		"steps": []any{map[string]any{"kind": "NOTIFY_CHATOPS_CHANNEL", "channel_id": channelID}},
+	})
+	if err != nil {
+		t.Fatalf("create chain: %v", err)
+	}
+	integ, err := eng.CreateIntegration(adminCtx, map[string]any{
+		"name": "system-a",
+		"routes": []any{map[string]any{
+			"name": "default", "match_type": "all", "is_default": true,
+			"escalation_chain_id": chain["id"],
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create integration: %v", err)
+	}
+	res, err := eng.IngestAlert(adminCtx, utils.StrVal(integ, "key"), map[string]any{
+		"title": "disk full", "labels": map[string]any{"alertname": "disk"},
+	})
+	if err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	groupID := utils.StrVal(res["group"].(map[string]any), "id")
+	rows := chatopsRows(t, ctx, st, groupID)
+	if len(rows) != 1 || rows[0].Target() != channelID {
+		t.Fatalf("channel messages = %d, want one to %s", len(rows), channelID)
+	}
+
+	if _, err := eng.DeleteEntity(adminCtx, "chatops_channels", channelID); err == nil ||
+		!strings.Contains(err.Error(), "system a") {
+		t.Errorf("deleting the channel a chain names: %v, want a conflict", err)
+	}
+}

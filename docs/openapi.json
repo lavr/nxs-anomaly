@@ -2834,6 +2834,10 @@
             "type": "string",
             "description": "Channel id on the platform itself (Slack channel id, Telegram chat id); inbound commands name this, not the internal id."
           },
+          "membership_fanout": {
+            "type": "boolean",
+            "description": "Whether the channel is posted to whenever an escalation step pages a member of its team (or its user). Defaults to true. False makes it hear only from NOTIFY_CHATOPS_CHANNEL steps that name it — the setting for one room per system, where a person on two systems' teams would otherwise carry one system's alert into the other's room."
+          },
           "interactive": {
             "type": "boolean",
             "description": "For a slack or mattermost channel: post alerts with the Acknowledge, Resolve, Silence and Open buttons a personal Slack or Mattermost notification carries (Mattermost also needs NXS_ANOMALY_PUBLIC_URL and NXS_ANOMALY_MATTERMOST_ACTION_SECRET). Taps arrive at the existing interactive endpoints and are matched to this channel by external_id. Defaults to false; a telegram channel always has its buttons."
@@ -4180,6 +4184,7 @@
               "NOTIFY_TEAM",
               "NOTIFY_EMERGENCY",
               "NOTIFY_DUTY_USERS",
+              "NOTIFY_CHATOPS_CHANNEL",
               "TRIGGER_WEBHOOK",
               "CREATE_ISSUE",
               "RESOLVE",
@@ -4204,6 +4209,10 @@
           "allow_uncovered": {
             "type": "boolean",
             "description": "Accept a schedule with coverage gaps in the next 7 days."
+          },
+          "channel_id": {
+            "type": "string",
+            "description": "NOTIFY_CHATOPS_CHANNEL only: the ChatOps channel the alert is posted to, whoever is or is not on its team. Required for that kind; a channel named by a step cannot be deleted."
           },
           "team_id": {
             "type": [
