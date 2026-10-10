@@ -27,7 +27,7 @@ import {
   IconTrash,
   IconUserSearch,
 } from '@tabler/icons-react';
-import { useAllOf, useCreate, useDelete, useFullList, useOnCall, useUpdate } from '../api/hooks';
+import { useAllOf, useChatopsChannels, useCreate, useDelete, useFullList, useOnCall, useUpdate } from '../api/hooks';
 import { STEP_KINDS, type EscalationChain, type EscalationStep, type StepKind } from '../api/types';
 import { ConfirmDeleteButton, PageHeader, ProvisionedBadge, QueryState } from '../components/common';
 import { ListPager, ListSearch, usePagedList } from '../components/PagedList';
@@ -53,15 +53,18 @@ function useChainNames(): ChainNames {
   const users = useAllOf('users');
   const teams = useAllOf('teams');
   const schedules = useAllOf('schedules');
+  const channels = useChatopsChannels();
   const map = (items: Array<{ id: string; name?: string }> | undefined) =>
     new Map((items ?? []).map((item) => [item.id, item.name ?? item.id]));
   const userNames = map(users.data);
   const teamNames = map(teams.data);
   const scheduleNames = map(schedules.data);
+  const channelNames = map(channels.data?.items);
   return {
     user: (id) => userNames.get(id) ?? id,
     team: (id) => teamNames.get(id) ?? id,
     schedule: (id) => scheduleNames.get(id) ?? id,
+    channel: (id) => channelNames.get(id) ?? id,
   };
 }
 
@@ -430,6 +433,7 @@ function StepFields({
   const users = useAllOf('users');
   const teams = useAllOf('teams');
   const schedules = useAllOf('schedules');
+  const channels = useChatopsChannels();
   const { t } = useI18n();
 
   const userOptions = (users.data ?? []).map((user) => ({ value: user.id, label: user.name }));
@@ -486,6 +490,21 @@ function StepFields({
           data={teamOptions}
           value={step.team_id ?? null}
           onChange={(value) => onChange({ team_id: value })}
+        />
+      );
+
+    case 'NOTIFY_CHATOPS_CHANNEL':
+      return (
+        <Select
+          label={t('chains.chatopsChannel')}
+          description={t('chains.chatopsChannelHelp')}
+          searchable
+          data={(channels.data?.items ?? []).map((channel) => ({
+            value: channel.id,
+            label: channel.name,
+          }))}
+          value={step.channel_id ?? null}
+          onChange={(value) => onChange({ channel_id: value ?? undefined })}
         />
       );
 

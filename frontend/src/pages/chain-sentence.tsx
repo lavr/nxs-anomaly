@@ -17,6 +17,8 @@ export interface ChainNames {
   user: (id: string) => string;
   team: (id: string) => string;
   schedule: (id: string) => string;
+  /** ChatOps channel names; callers that show no channel steps may omit it. */
+  channel?: (id: string) => string;
 }
 
 export function stepSentence(
@@ -46,6 +48,12 @@ export function stepSentence(
       return t('chains.say.notifyEmergency');
     case 'NOTIFY_DUTY_USERS':
       return t('chains.say.notifyDuty');
+    case 'NOTIFY_CHATOPS_CHANNEL': {
+      const id = step.channel_id;
+      return id
+        ? t('chains.say.notifyChannel', { who: names.channel?.(id) ?? id })
+        : t('chains.say.notifyChannelNobody');
+    }
     case 'TRIGGER_WEBHOOK':
       return t('chains.say.webhook');
     case 'CREATE_ISSUE':
@@ -75,6 +83,8 @@ export function stepReachesNobody(step: EscalationStep): boolean {
       return empty(step.schedule_ids);
     case 'NOTIFY_TEAM':
       return empty(step.team_ids);
+    case 'NOTIFY_CHATOPS_CHANNEL':
+      return !step.channel_id;
     default:
       return false;
   }
