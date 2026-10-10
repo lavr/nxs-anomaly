@@ -79,8 +79,13 @@ func (e *Engine) CreateChatopsChannel(ctx context.Context, payload map[string]an
 				// personal notifications have them. Off unless asked for: see
 				// chatopsAlertBody.
 				"interactive": utils.BoolVal(payload, "interactive", false),
-				"created_at":  ts,
-				"updated_at":  ts,
+				// Whether the channel hears about every alert that pages a
+				// member of its team. Off makes it hear only from the
+				// NOTIFY_CHATOPS_CHANNEL steps that name it, which is what a
+				// room per system needs when people belong to several.
+				"membership_fanout": utils.BoolVal(payload, "membership_fanout", true),
+				"created_at":        ts,
+				"updated_at":        ts,
 			}
 			stampProvisioner(ctx, channel)
 			state.ChatopsChannels[channel["id"].(string)] = channel
@@ -171,6 +176,9 @@ func (e *Engine) UpdateChatopsChannel(ctx context.Context, channelID string, pay
 			}
 			if v, ok := payload["interactive"]; ok {
 				channel["interactive"] = utils.BoolVal(map[string]any{"v": v}, "v", false)
+			}
+			if v, ok := payload["membership_fanout"]; ok {
+				channel["membership_fanout"] = utils.BoolVal(map[string]any{"v": v}, "v", true)
 			}
 			if teamIDSet {
 				channel["team_id"] = teamID

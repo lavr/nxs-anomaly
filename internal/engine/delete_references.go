@@ -44,7 +44,7 @@ func (e *Engine) deleteBlockedByReferences(ctx context.Context, collection, id s
 func (e *Engine) pagingReferences(ctx context.Context, collection, id string, now time.Time) ([]string, error) {
 	var refs []string
 	switch collection {
-	case "users", "teams", "schedules":
+	case "users", "teams", "schedules", "chatops_channels":
 		chains, err := e.store.ListCollection(ctx, "escalation_chains")
 		if err != nil {
 			return nil, err
@@ -145,6 +145,8 @@ func stepReferences(step map[string]any, collection, id string) bool {
 		return utils.StrVal(step, "team_id") == id
 	case "schedules":
 		return utils.StrVal(step, "schedule_id") == id
+	case "chatops_channels":
+		return utils.StrVal(step, "channel_id") == id
 	}
 	return false
 }
