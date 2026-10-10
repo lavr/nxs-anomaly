@@ -33,6 +33,10 @@ semantic versioning once it reaches 1.0.
   as an edit of that message through the delivery queue. Without the setting,
   without an id, or when the platform refuses the edit, the status is posted as
   a new message.
+- **Buttons in Slack and Mattermost ChatOps channels.** A channel created or
+  updated with `"interactive": true` is posted the alert with the same buttons
+  and group link a personal Slack or Mattermost notification has; taps arrive
+  through the existing interactive endpoints. Off by default.
 
 ## [1.9.20] — 2026-10-06
 

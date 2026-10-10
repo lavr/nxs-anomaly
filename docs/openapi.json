@@ -2834,6 +2834,10 @@
             "type": "string",
             "description": "Channel id on the platform itself (Slack channel id, Telegram chat id); inbound commands name this, not the internal id."
           },
+          "interactive": {
+            "type": "boolean",
+            "description": "For a slack or mattermost channel: post alerts with the Acknowledge, Resolve, Silence and Open buttons a personal Slack or Mattermost notification carries (Mattermost also needs NXS_ANOMALY_PUBLIC_URL and NXS_ANOMALY_MATTERMOST_ACTION_SECRET). Taps arrive at the existing interactive endpoints and are matched to this channel by external_id. Defaults to false; a telegram channel always has its buttons."
+          },
           "message_update": {
             "type": [
               "object",
