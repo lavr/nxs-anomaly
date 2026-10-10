@@ -422,6 +422,7 @@ The supported steps:
 | `NOTIFY_TEAM` | Notify every member of a team |
 | `NOTIFY_EMERGENCY` | Notify the emergency user |
 | `NOTIFY_DUTY_USERS` | Notify a team's duty users |
+| `NOTIFY_CHATOPS_CHANNEL` | Post to one ChatOps channel, independently of team membership |
 | `TRIGGER_WEBHOOK` | Create a webhook notification |
 | `CREATE_ISSUE` | Create an issue in an external tracker |
 | `RESOLVE` | Resolve the group |

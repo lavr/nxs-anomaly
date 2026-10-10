@@ -33,6 +33,14 @@ semantic versioning once it reaches 1.0.
   as an edit of that message through the delivery queue. Without the setting,
   without an id, or when the platform refuses the edit, the status is posted as
   a new message.
+- **`NOTIFY_CHATOPS_CHANNEL` escalation step.** Posts the alert to the ChatOps
+  channel it names (`channel_id`), independently of who is on the channel's
+  team, with the same message, templates, status messages and edits as
+  membership fan-out. A channel with `"membership_fanout": false` hears only
+  from such steps, so a room per system no longer receives other systems'
+  alerts through people on several teams. `membership_fanout` defaults to
+  `true`; existing channels behave as before. A channel named by a chain step
+  cannot be deleted.
 - **Buttons in Slack and Mattermost ChatOps channels.** A channel created or
   updated with `"interactive": true` is posted the alert with the same buttons
   and group link a personal Slack or Mattermost notification has; taps arrive
