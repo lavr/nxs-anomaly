@@ -463,7 +463,8 @@ Alertmanager alert can carry dozens of labels.
 | `status` | the group's status (`open` by default) |
 | `labels` | every label on one line, `k=v, k=v` |
 | `label_<name>` | one label's value |
-| `user_name`, `user_username` | the recipient |
+| `user_name`, `user_username` | the recipient; empty on a ChatOps status message, which has none |
+| `event` | on a ChatOps status message, what happened: `acknowledged`, `unacknowledged` or `resolved` (`reason` then says who did it); empty on the alert itself, so `{{ if .event }}…{{ else }}…{{ end }}` lets one template serve both |
 | `group_url` | the group's page, `<NXS_ANOMALY_PUBLIC_URL>/alert-groups/<group_id>`; empty without `NXS_ANOMALY_PUBLIC_URL` |
 | `generator_url` | the source's link to what fired (the rule, the query); from the latest alert that sent one |
 | `dashboard_url`, `panel_url`, `silence_url` | Grafana Alerting's dashboard, panel and new-silence links; from the latest alert that sent them |

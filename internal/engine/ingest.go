@@ -468,6 +468,7 @@ func (e *Engine) ingestOneLocked(state *store.State, integration map[string]any,
 				"actor_kind": authz.SystemActor.Kind,
 				"resolution": "source",
 			})
+			e.notifyChatopsStatus(state, g, chatopsEventResolved, sourceActor, ts)
 		}
 		e.notifyGroupResolved(state, g, ts)
 		state.AlertGroups[g.ID()] = g

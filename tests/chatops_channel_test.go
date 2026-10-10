@@ -77,6 +77,34 @@ func chatopsRows(t *testing.T, ctx context.Context, st store.PostgreSQLStore, gr
 	return out
 }
 
+// The unique idempotency key is the database's, so this is where a key built
+// from a second-resolution timestamp would have dropped the second
+// acknowledge.
+func TestChatopsStatusWithinOneSecondInPostgres(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv("NXS_ANOMALY_CHATOPS_STATUS_UPDATES", "true")
+	st, eng := newIntegrationEngine(t, ctx)
+	defer st.Close()
+	clearStore(t, ctx, st)
+
+	groupID, _, _ := pagedChatopsGroup(t, ctx, eng, "https://chat.example.com", nil)
+	adminCtx := chatopsAdmin(ctx)
+	for _, step := range []func(context.Context, string) (map[string]any, error){
+		eng.AcknowledgeGroup, eng.UnacknowledgeGroup, eng.AcknowledgeGroup,
+	} {
+		if _, err := step(adminCtx, groupID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := map[string]int{}
+	for _, n := range chatopsRows(t, ctx, st, groupID) {
+		events[utils.StrVal(n.Payload(), "chatops_event")]++
+	}
+	if events["acknowledged"] != 2 || events["unacknowledged"] != 1 {
+		t.Errorf("status messages = %v, want two acknowledged and one unacknowledged", events)
+	}
+}
+
 // The channel's message survives the member it was sent on behalf of.
 func TestChatopsMessageSurvivesTheMemberInPostgres(t *testing.T) {
 	ctx := context.Background()
